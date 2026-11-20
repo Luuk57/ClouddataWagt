@@ -38,6 +38,10 @@ const pinUnlockBtn = document.getElementById("pinUnlockBtn");
 const pinStatusMsg = document.getElementById("pinStatusMsg");
 const lockScreenBtn = document.getElementById("lockScreenBtn");
 
+// DOM-elementen voor volledig beeld-knoppen
+const fullscreenTopBtn = document.getElementById("fullscreenTopBtn");
+const fullscreenTaskBtn = document.getElementById("fullscreenTaskBtn");
+
 // DOM-elementen voor schil & beheer
 const topTitleText = document.getElementById("topTitleText");
 const topConnStatus = document.getElementById("topConnStatus");
@@ -82,6 +86,42 @@ let unsubMe = null;
 let unsubSettings = null;
 let unsubUsers = null;
 
+function setStatus(text) {
+  statusMsg.textContent = text || "";
+}
+
+function setLoginStatus(text) {
+  loginStatusMsg.textContent = text || "";
+}
+
+// Volledig beeld (Fullscreen API)
+function syncFullscreenButtons() {
+  const isFs = Boolean(document.fullscreenElement);
+  const label = isFs ? "Sluit volledig beeld" : "Volledig beeld";
+  fullscreenTopBtn.textContent = label;
+  fullscreenTaskBtn.textContent = label;
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (err) {
+    setStatus("Volledig beeld niet ondersteund of geweigerd: " + err.message);
+  } finally {
+    syncFullscreenButtons();
+  }
+}
+
+fullscreenTopBtn.addEventListener("click", toggleFullscreen);
+fullscreenTaskBtn.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", syncFullscreenButtons);
+syncFullscreenButtons();
+
+// Volledige pincode-vergrendeling
 function applyPinLockState(locked) {
   isPinLocked = Boolean(locked);
   localStorage.setItem(PIN_STORAGE_KEY, isPinLocked ? "true" : "false");
@@ -94,7 +134,6 @@ function applyPinLockState(locked) {
   }
 }
 
-// Direct bij laden vergrendelstand toepassen (blijft aan bij refresh)
 applyPinLockState(isPinLocked);
 
 window.addEventListener("beforeunload", (event) => {
@@ -150,14 +189,6 @@ function cleanupListeners() {
   unsubMe = null;
   unsubSettings = null;
   unsubUsers = null;
-}
-
-function setStatus(text) {
-  statusMsg.textContent = text || "";
-}
-
-function setLoginStatus(text) {
-  loginStatusMsg.textContent = text || "";
 }
 
 function updateClock() {
