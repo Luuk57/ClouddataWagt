@@ -18,6 +18,73 @@
 
     .hidden { display: none !important; }
 
+    /* Volledig scherm pincode-slot (boven alles, blijft na refresh staan) */
+    .pin-lock-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 9999;
+      background: radial-gradient(circle at top, #132c4e 0%, #07101d 70%, #040912 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      user-select: none;
+    }
+    .pin-box {
+      width: 100%;
+      max-width: 390px;
+      background: #102036;
+      border: 1px solid #3c6296;
+      border-radius: 6px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+      overflow: hidden;
+    }
+    .pin-header {
+      background: linear-gradient(90deg, #153154 0%, #1d416e 100%);
+      padding: 12px 16px;
+      border-bottom: 1px solid #3c6296;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+    }
+    .pin-body { padding: 20px; }
+    .pin-display {
+      width: 100%;
+      text-align: center;
+      letter-spacing: 0.45em;
+      font-size: 1.5rem;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #3c6296;
+      background: #07101d;
+      color: #7dd3fc;
+      margin-bottom: 14px;
+    }
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .key-btn {
+      padding: 14px 10px;
+      font-size: 1.15rem;
+      font-weight: 700;
+      background: #162b49;
+      border: 1px solid #3c6296;
+      color: #f8fafc;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .key-btn:hover { background: #213e69; }
+    .key-btn.secondary-key { background: #1e3352; font-size: 0.92rem; }
+    .key-btn.ok-key { background: #15803d; border-color: #22c55e; font-size: 0.92rem; }
+    .key-btn.ok-key:hover { background: #166534; }
+
     /* Bovenste Windows-balk */
     .win-topbar {
       background: #07101d;
@@ -34,7 +101,7 @@
       background: #1d4ed8; color: #fff; font-size: 0.74rem;
       padding: 3px 8px; border-radius: 3px; letter-spacing: 0.04em;
     }
-    .win-meta { font-size: 0.85rem; color: #94a3b8; }
+    .win-meta { font-size: 0.85rem; color: #94a3b8; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
     /* Werkruimte & Windows-vensters */
     .desktop { max-width: 1080px; margin: 0 auto; padding: 20px 16px; }
@@ -78,6 +145,7 @@
     button.warning:hover { background: #92400e; }
     button.danger { background: #991b1b; border-color: #ef4444; }
     button.danger:hover { background: #7f1d1d; }
+    button.small-inline { width: auto; padding: 6px 12px; font-size: 0.84rem; }
 
     .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -93,6 +161,7 @@
     .badge.blocked { background: #7f1d1d; color: #fecaca; }
 
     .status { min-height: 20px; font-size: 0.9rem; color: #7dd3fc; margin-top: 8px; }
+    .error-text { color: #fca5a5; }
     .muted { color: #94a3b8; font-size: 0.88rem; }
 
     .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -116,7 +185,6 @@
     }
     .user-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
-    /* Windows-taakbalk */
     .win-taskbar {
       position: fixed; bottom: 0; left: 0; right: 0; height: 46px;
       background: #07101d; border-top: 1px solid #2c4e7c;
@@ -137,16 +205,60 @@
   </style>
 </head>
 <body>
+  <!-- Volledig beeld pincode-vergrendeling -->
+  <div id="pinLockOverlay" class="pin-lock-overlay" aria-modal="true" role="dialog">
+    <div class="pin-box">
+      <div class="pin-header">
+        <span>SCHERM VERGRENDELD</span>
+        <span class="badge">PINCODE</span>
+      </div>
+      <div class="pin-body">
+        <p class="muted" style="margin-top: 0;">
+          Volledig beeld vergrendeld. Alleen te ontgrendelen met pincode (blijft actief bij herladen).
+        </p>
+
+        <input
+          id="pinDisplayInput"
+          class="pin-display"
+          type="password"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="••••"
+        />
+
+        <div class="keypad">
+          <button type="button" class="key-btn" data-digit="1">1</button>
+          <button type="button" class="key-btn" data-digit="2">2</button>
+          <button type="button" class="key-btn" data-digit="3">3</button>
+          <button type="button" class="key-btn" data-digit="4">4</button>
+          <button type="button" class="key-btn" data-digit="5">5</button>
+          <button type="button" class="key-btn" data-digit="6">6</button>
+          <button type="button" class="key-btn" data-digit="7">7</button>
+          <button type="button" class="key-btn" data-digit="8">8</button>
+          <button type="button" class="key-btn" data-digit="9">9</button>
+          <button type="button" class="key-btn secondary-key" id="pinClearBtn">Wis</button>
+          <button type="button" class="key-btn" data-digit="0">0</button>
+          <button type="button" class="key-btn ok-key" id="pinUnlockBtn">Open</button>
+        </div>
+
+        <div id="pinStatusMsg" class="status"></div>
+      </div>
+    </div>
+  </div>
+
   <header class="win-topbar">
     <div class="win-brand">
       <span class="win-tag">WINDOWS SHELL</span>
       <span id="topTitleText">Cloudsysteem Wagt 2026</span>
     </div>
-    <div class="win-meta" id="topConnStatus">Klaar voor aanmelding</div>
+    <div class="win-meta">
+      <span id="topConnStatus">Klaar voor aanmelding</span>
+      <button type="button" id="lockScreenBtn" class="warning small-inline">Vergrendel (Pincode)</button>
+    </div>
   </header>
 
   <main class="desktop">
-    <!-- Inlog- en registratievenster -->
+    <!-- Inlogvenster -->
     <section id="loginSection" class="win-window" style="max-width: 520px; margin: 24px auto;">
       <div class="win-titlebar">
         <span>Inloggen — Cloudsysteem Wagt 2026</span>
@@ -181,7 +293,6 @@
 
     <!-- Actieve Windows-schil -->
     <section id="shellSection" class="hidden">
-      <!-- Schil-overzicht -->
       <div id="panelShell" class="win-window">
         <div class="win-titlebar">
           <span id="welcomeTitle">Sessie</span>
@@ -220,10 +331,13 @@
             </div>
 
             <div>
-              <h3>Systeeminstellingen (<code>settings/app</code>)</h3>
+              <h3>Systeem- &amp; pincode-instellingen (<code>settings/app</code>)</h3>
               <form id="settingsForm">
                 <label for="systemTitleInput">Titel in de Windows-schil</label>
                 <input id="systemTitleInput" type="text" required />
+
+                <label for="unlockPinInput">Ontgrendel-pincode (cijfers)</label>
+                <input id="unlockPinInput" type="text" inputmode="numeric" pattern="[0-9]{4,10}" required placeholder="1234" />
 
                 <div class="checkbox-row">
                   <input id="maintenanceInput" type="checkbox" />
