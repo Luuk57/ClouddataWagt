@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dialyse & Beheer OS (Windows Desktop)</title>
+  <title>Cloudbeheer</title>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -15,81 +15,104 @@
 
   <style>
     :root {
-      --win-blue: #0078d4;
-      --win-blue-dark: #005a9e;
-      --win-taskbar: rgba(24, 28, 36, 0.94);
-      --win-start: rgba(32, 36, 46, 0.97);
-      --win-titlebar: #e5eef8;
-      --win-titlebar-active: #0067c0;
-      --win-border: #94a3b8;
-      --success: #16a34a;
+      --cb-accent: #0f6cbd;
+      --cb-accent-hover: #115ea3;
+      --cb-accent-soft: #ebf3fc;
+      --cb-surface: #ffffff;
+      --cb-surface-alt: #f8fafc;
+      --cb-border: #cbd5e1;
+      --cb-border-subtle: #e2e8f0;
+      --cb-text: #0f172a;
+      --cb-muted: #64748b;
+      --cb-taskbar: rgba(15, 23, 42, 0.92);
+      --cb-start: rgba(15, 23, 42, 0.96);
+      --success: #15803d;
       --warning: #d97706;
-      --danger: #dc2626;
+      --danger: #b91c1c;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; user-select: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1120; color: var(--cb-text); user-select: none; }
 
-    /* LOGIN & STANDBY SCHERM */
+    /* LOGIN & STANDBY */
     #loginScreen, #pendingScreen {
       position: fixed; inset: 0; z-index: 99999;
-      background: radial-gradient(circle at 30% 20%, #1e40af, #0f172a 75%);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.25), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(37, 99, 235, 0.30), transparent 50%),
+        linear-gradient(145deg, #0b132b 0%, #111827 55%, #090d16 100%);
       display: none; justify-content: center; align-items: center; padding: 20px;
     }
-    .win-login-card {
-      background: rgba(255, 255, 255, 0.96); width: 100%; max-width: 380px;
-      border-radius: 12px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    .cb-auth-card {
+      background: rgba(255, 255, 255, 0.98); width: 100%; max-width: 390px;
+      border-radius: 14px; padding: 30px 28px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.25);
       text-align: center; user-select: text;
     }
-    .win-login-card h2 { color: #0f172a; margin-bottom: 6px; font-size: 1.35rem; }
-    .win-login-card p.sub { color: #64748b; font-size: 0.85rem; margin-bottom: 18px; }
-    .form-row { text-align: left; margin-bottom: 12px; }
-    .form-row label { display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 4px; }
-    .form-row input { width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+    .cb-brand-mark {
+      width: 52px; height: 52px; margin: 0 auto 14px auto; border-radius: 12px;
+      background: linear-gradient(135deg, #0284c7, #1d4ed8);
+      color: #fff; font-size: 1.5rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 10px 20px rgba(29, 78, 216, 0.3);
+    }
+    .cb-auth-card h2 { color: var(--cb-text); margin-bottom: 4px; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+    .cb-auth-card p.sub { color: var(--cb-muted); font-size: 0.85rem; margin-bottom: 20px; }
+    .form-row { text-align: left; margin-bottom: 13px; }
+    .form-row label { display: block; font-size: 0.78rem; font-weight: 600; color: #334155; margin-bottom: 5px; }
+    .form-row input {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--cb-border);
+      border-radius: 7px; font-size: 0.92rem; transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-row input:focus { outline: none; border-color: var(--cb-accent); box-shadow: 0 0 0 3px rgba(15, 108, 189, 0.16); }
 
-    /* WINDOWS DESKTOP ACHTERGROND */
+    /* WINDOWS DESKTOP */
     #desktop {
-      position: relative; width: 100%; height: calc(100vh - 46px);
-      background: linear-gradient(135deg, #004e92 0%, #000428 100%);
+      position: relative; width: 100%; height: calc(100vh - 48px);
+      background:
+        radial-gradient(circle at 18% 22%, rgba(56, 189, 248, 0.22), transparent 42%),
+        radial-gradient(circle at 82% 78%, rgba(59, 130, 246, 0.24), transparent 48%),
+        linear-gradient(135deg, #0f294a 0%, #0b162c 52%, #070d19 100%);
       overflow: hidden; display: none;
     }
 
-    /* BUREAUBLAD ICONEN RASTER (KOLOMMEN VAN BOVEN NAAR BENEDEN) */
+    /* BUREAUBLAD ICONEN */
     .desktop-icons {
       display: flex; flex-direction: column; flex-wrap: wrap;
-      align-content: flex-start; gap: 8px; padding: 14px;
+      align-content: flex-start; gap: 6px; padding: 14px;
       height: 100%; width: fit-content;
     }
     .desktop-icon {
-      width: 92px; padding: 8px 4px; border-radius: 6px;
+      width: 92px; padding: 8px 5px; border-radius: 8px;
       display: flex; flex-direction: column; align-items: center; gap: 5px;
-      cursor: pointer; border: 1px solid transparent; color: #fff;
-      text-shadow: 0 1px 3px rgba(0,0,0,0.85); transition: background 0.15s;
+      cursor: pointer; border: 1px solid transparent; color: #f8fafc;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9); transition: background 0.14s, border-color 0.14s;
     }
-    .desktop-icon:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.35); }
-    .desktop-icon:active { background: rgba(255, 255, 255, 0.28); }
+    .desktop-icon:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.24); }
+    .desktop-icon:active { background: rgba(255, 255, 255, 0.22); }
     .icon-badge {
-      width: 42px; height: 42px; border-radius: 9px;
+      width: 44px; height: 44px; border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.25rem; font-weight: bold; color: #fff;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+      font-size: 1.25rem; font-weight: 700; color: #fff;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.35), inset 0 1px 1px rgba(255,255,255,0.35);
     }
     .desktop-icon span {
-      font-size: 0.74rem; text-align: center; line-height: 1.15;
+      font-size: 0.74rem; font-weight: 500; text-align: center; line-height: 1.15;
       word-break: break-word; max-width: 86px;
     }
     .micro-tag {
-      font-size: 0.62rem; background: rgba(0,0,0,0.45); padding: 1px 5px;
-      border-radius: 4px; color: #bae6fd; margin-top: -2px;
+      font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+      background: rgba(15, 23, 42, 0.62); border: 1px solid rgba(186, 230, 253, 0.28);
+      padding: 1px 6px; border-radius: 999px; color: #bae6fd; margin-top: -1px;
     }
 
-    /* WINDOWS VENSTERS */
+    /* VENSTERS */
     .win-window {
-      position: absolute; background: #f8fafc;
-      border: 1px solid #475569; border-radius: 8px;
-      box-shadow: 0 14px 38px rgba(0,0,0,0.45);
+      position: absolute; background: var(--cb-surface);
+      border: 1px solid rgba(148, 163, 184, 0.75); border-radius: 10px;
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.2);
       display: flex; flex-direction: column; overflow: hidden;
-      min-width: 310px; min-height: 220px;
+      min-width: 320px; min-height: 220px;
       resize: both; user-select: text;
     }
     .win-window.minimized { display: none !important; }
@@ -100,98 +123,130 @@
     }
 
     .win-titlebar {
-      height: 34px; background: var(--win-titlebar); color: #1e293b;
+      height: 36px; background: #eef2f6; color: #1e293b;
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0 6px 0 10px; cursor: move; flex-shrink: 0;
-      border-bottom: 1px solid #cbd5e1; user-select: none;
+      padding: 0 6px 0 12px; cursor: move; flex-shrink: 0;
+      border-bottom: 1px solid var(--cb-border-subtle); user-select: none;
+      transition: background 0.15s, color 0.15s;
     }
     .win-window.active-win .win-titlebar {
-      background: var(--win-titlebar-active); color: #ffffff;
+      background: linear-gradient(90deg, #0f6cbd 0%, #1d4ed8 100%);
+      color: #ffffff; border-bottom-color: transparent;
     }
     .win-title-left { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 600; overflow: hidden; white-space: nowrap; }
     .win-controls { display: flex; height: 100%; }
     .win-ctrl-btn {
-      width: 36px; height: 100%; border: none; background: transparent;
-      color: inherit; font-size: 0.95rem; cursor: pointer;
+      width: 38px; height: 100%; border: none; background: transparent;
+      color: inherit; font-size: 0.92rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
+      transition: background 0.12s;
     }
-    .win-ctrl-btn:hover { background: rgba(255,255,255,0.2); }
-    .win-ctrl-btn.close:hover { background: #e81123; color: #fff; }
+    .win-ctrl-btn:hover { background: rgba(148, 163, 184, 0.25); }
+    .win-window.active-win .win-ctrl-btn:hover { background: rgba(255, 255, 255, 0.18); }
+    .win-ctrl-btn.close:hover { background: #dc2626 !important; color: #fff; }
 
     .win-body {
-      flex: 1; overflow-y: auto; overflow-x: auto; padding: 14px;
-      background: #ffffff; font-size: 0.88rem; color: #1e293b;
+      flex: 1; overflow-y: auto; overflow-x: auto; padding: 15px;
+      background: var(--cb-surface); font-size: 0.88rem; color: var(--cb-text);
     }
 
-    /* WINDOWS TAAKBALK & STARTMENU */
+    /* TAAKBALK & STARTMENU */
     #taskbar {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 46px;
-      background: var(--win-taskbar); border-top: 1px solid rgba(255,255,255,0.14);
+      position: fixed; bottom: 0; left: 0; right: 0; height: 48px;
+      background: var(--cb-taskbar); backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
       display: none; align-items: center; justify-content: space-between;
       padding: 0 10px; z-index: 9000; color: #fff;
     }
     .taskbar-left { display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1; padding-right: 10px; }
     .start-btn {
-      background: var(--win-blue); color: #fff; border: none; border-radius: 5px;
-      padding: 6px 14px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
-      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+      background: linear-gradient(135deg, #0ea5e9, #1d4ed8); color: #fff;
+      border: none; border-radius: 6px; padding: 7px 14px;
+      font-weight: 700; font-size: 0.84rem; cursor: pointer;
+      display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(29, 78, 216, 0.35);
     }
-    .start-btn:hover { background: #1084e0; }
+    .start-btn:hover { filter: brightness(1.08); }
     .task-item {
-      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-      color: #e2e8f0; padding: 5px 11px; border-radius: 4px; font-size: 0.8rem;
-      cursor: pointer; white-space: nowrap; max-width: 170px; overflow: hidden; text-overflow: ellipsis;
+      background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0; padding: 6px 11px; border-radius: 6px; font-size: 0.8rem;
+      cursor: pointer; white-space: nowrap; max-width: 175px; overflow: hidden; text-overflow: ellipsis;
+      transition: background 0.14s;
     }
-    .task-item.active { background: rgba(255,255,255,0.26); border-bottom: 3px solid #38bdf8; color: #fff; font-weight: 600; }
+    .task-item:hover { background: rgba(255, 255, 255, 0.15); }
+    .task-item.active { background: rgba(255, 255, 255, 0.22); border-bottom: 3px solid #38bdf8; color: #fff; font-weight: 600; }
     .taskbar-tray { display: flex; align-items: center; gap: 12px; font-size: 0.78rem; color: #cbd5e1; flex-shrink: 0; }
 
     #startMenu {
-      position: fixed; bottom: 50px; left: 10px; width: 340px; max-width: calc(100vw - 20px);
-      background: var(--win-start); border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px; padding: 14px; z-index: 9500; color: #fff;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.6); display: none;
+      position: fixed; bottom: 54px; left: 10px; width: 356px; max-width: calc(100vw - 20px);
+      background: var(--cb-start); backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 12px; padding: 16px; z-index: 9500; color: #fff;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.65); display: none;
     }
-    .start-section-title { font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; margin: 10px 0 6px 0; letter-spacing: 0.5px; }
+    .start-brand-header {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.14); padding-bottom: 10px;
+    }
+    .start-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin: 12px 0 6px 0; letter-spacing: 0.06em; }
     .start-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
     .start-app-btn {
-      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.08);
-      color: #f1f5f9; padding: 7px 9px; border-radius: 6px; text-align: left;
-      font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 7px;
+      background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f1f5f9; padding: 7px 9px; border-radius: 7px; text-align: left;
+      font-size: 0.79rem; cursor: pointer; display: flex; align-items: center; gap: 7px;
+      transition: background 0.12s;
     }
-    .start-app-btn:hover { background: rgba(255,255,255,0.18); }
+    .start-app-btn:hover { background: rgba(255, 255, 255, 0.16); }
 
-    /* INTERNE UI ELEMENTEN BINNEN VENSTERS */
-    .btn { background: var(--win-blue); color: #fff; border: none; padding: 7px 13px; border-radius: 5px; font-size: 0.84rem; font-weight: 600; cursor: pointer; }
-    .btn:hover { background: var(--win-blue-dark); }
+    /* COMPONENTEN BINNEN VENSTERS */
+    .btn {
+      background: var(--cb-accent); color: #fff; border: none;
+      padding: 7px 14px; border-radius: 6px; font-size: 0.84rem;
+      font-weight: 600; cursor: pointer; transition: background 0.14s, filter 0.14s;
+    }
+    .btn:hover { background: var(--cb-accent-hover); }
     .btn-success { background: var(--success); }
+    .btn-success:hover { filter: brightness(1.07); }
     .btn-danger { background: var(--danger); }
-    .btn-warning { background: var(--warning); color: #000; }
-    .btn-secondary { background: #64748b; }
-    .btn-sm { padding: 4px 9px; font-size: 0.78rem; }
+    .btn-danger:hover { filter: brightness(1.08); }
+    .btn-warning { background: var(--warning); color: #0f172a; }
+    .btn-secondary { background: #475569; }
+    .btn-secondary:hover { background: #334155; }
+    .btn-sm { padding: 4px 9px; font-size: 0.77rem; }
 
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 10px; margin-bottom: 10px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 0.78rem; font-weight: 600; color: #334155; }
-    .field input, .field select, .field textarea { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 0.86rem; background: #fff; }
+    .field label { font-size: 0.77rem; font-weight: 600; color: #334155; }
+    .field input, .field select, .field textarea {
+      padding: 7px 10px; border: 1px solid var(--cb-border); border-radius: 6px;
+      font-size: 0.85rem; background: #fff; color: var(--cb-text);
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none; border-color: var(--cb-accent);
+    }
     .readonly { background: #f1f5f9 !important; font-weight: 700; }
 
-    .card-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .card-box {
+      background: var(--cb-surface-alt); border: 1px solid var(--cb-border-subtle);
+      border-radius: 9px; padding: 12px 14px; margin-bottom: 12px;
+    }
     .chip-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
     .data-chip {
-      background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1;
-      padding: 5px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+      background: var(--cb-accent-soft); border: 1px solid #bae6fd; color: #0369a1;
+      padding: 5px 11px; border-radius: 999px; font-size: 0.81rem; font-weight: 600;
       display: inline-flex; align-items: center; gap: 8px;
     }
-    .data-chip button { background: none; border: none; color: #dc2626; font-weight: bold; cursor: pointer; font-size: 0.95rem; }
+    .data-chip button { background: none; border: none; color: #dc2626; font-weight: 700; cursor: pointer; font-size: 0.95rem; line-height: 1; }
 
-    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
-    th, td { border: 1px solid #e2e8f0; padding: 7px 8px; text-align: left; }
-    th { background: #1e293b; color: #fff; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; border-radius: 6px; overflow: hidden; }
+    th, td { border: 1px solid var(--cb-border-subtle); padding: 7px 9px; text-align: left; }
+    th { background: #1e293b; color: #f8fafc; font-weight: 600; }
     tr:nth-child(even) { background: #f8fafc; }
+    tr:hover { background: #f1f5f9; }
 
-    .badge { padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: #fff; display: inline-block; }
+    .badge { padding: 2px 7px; border-radius: 5px; font-size: 0.74rem; font-weight: 700; color: #fff; display: inline-block; }
     .bg-green { background: #16a34a; }
-    .bg-orange { background: #f59e0b; color: #000; }
+    .bg-orange { background: #f59e0b; color: #0f172a; }
     .bg-red { background: #dc2626; }
     .bg-blue { background: #0284c7; }
     .bg-gray { background: #64748b; }
@@ -201,30 +256,26 @@
     .uf-orange { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
     .uf-red { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
 
-    /* VOCHT POS TEGELS & BALKEN */
-    .bar-wrap { background: #e2e8f0; border-radius: 7px; padding: 10px; margin-bottom: 10px; }
-    .bar-track { width: 100%; height: 16px; background: #cbd5e1; border-radius: 8px; overflow: hidden; margin-top: 5px; }
+    /* VOCHT POS */
+    .bar-wrap { background: #f1f5f9; border: 1px solid var(--cb-border-subtle); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .bar-track { width: 100%; height: 14px; background: #cbd5e1; border-radius: 999px; overflow: hidden; margin-top: 6px; }
     .bar-fill { height: 100%; width: 0%; background: #16a34a; transition: width 0.25s; }
     .pos-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 8px; }
     .pos-btn {
-      background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px;
+      background: #fff; border: 1px solid var(--cb-border-subtle); border-radius: 9px; padding: 8px;
       text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      transition: border-color 0.14s, background 0.14s, transform 0.12s;
     }
-    .pos-btn:hover { border-color: var(--win-blue); background: #eff6ff; }
-    .pos-btn img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; }
+    .pos-btn:hover { border-color: var(--cb-accent); background: var(--cb-accent-soft); transform: translateY(-1px); }
+    .pos-btn img { width: 52px; height: 52px; object-fit: cover; border-radius: 7px; }
     .pos-btn span { font-size: 0.78rem; font-weight: 600; }
 
-    /* SUBTABS IN VENSTERS */
-    .win-tabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; flex-wrap: wrap; }
-    .win-tab { background: #e2e8f0; border: none; padding: 5px 11px; border-radius: 5px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-    .win-tab.active { background: var(--win-blue); color: #fff; }
-
-    /* MODAL BINNEN DESKTOP */
+    /* POPUP */
     #vochtPopup {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9800;
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(3px); z-index: 9800;
       display: none; justify-content: center; align-items: center; padding: 15px;
     }
-    .popup-box { background: #fff; border-radius: 10px; padding: 20px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .popup-box { background: #fff; border-radius: 12px; padding: 22px; width: 100%; max-width: 365px; text-align: center; box-shadow: 0 20px 45px rgba(0,0,0,0.35); }
     .amt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
   </style>
 </head>
@@ -232,9 +283,10 @@
 
   <!-- 1. INLOGSCHERM -->
   <div id="loginScreen">
-    <div class="win-login-card">
-      <h2 id="authHeading">Dialyse & Beheer OS</h2>
-      <p class="sub">Log in om je Windows-werkomgeving te starten</p>
+    <div class="cb-auth-card">
+      <div class="cb-brand-mark">CB</div>
+      <h2 id="authHeading">Cloudbeheer</h2>
+      <p class="sub">Meld je aan om de werkplek en modules te openen</p>
       <div class="form-row">
         <label>E-mailadres</label>
         <input type="email" id="loginEmail" placeholder="naam@voorbeeld.nl">
@@ -243,8 +295,8 @@
         <label>Wachtwoord</label>
         <input type="password" id="loginPass" placeholder="••••••••">
       </div>
-      <button class="btn" style="width:100%; margin-top:6px;" id="authBtn" onclick="submitAuth()">Inloggen</button>
-      <p style="margin-top:12px; font-size:0.82rem; color:#0067c0; cursor:pointer;" onclick="toggleRegister()">
+      <button class="btn" style="width:100%; padding:9px 14px; margin-top:4px;" id="authBtn" onclick="submitAuth()">Inloggen</button>
+      <p style="margin-top:14px; font-size:0.82rem; color:var(--cb-accent); font-weight:600; cursor:pointer;" onclick="toggleRegister()">
         <span id="authSwitchText">Nog geen account? Registreer hier</span>
       </p>
       <p id="authErr" style="color:#dc2626; font-size:0.8rem; margin-top:8px;"></p>
@@ -253,38 +305,42 @@
 
   <!-- 1B. STANDBY SCHERM -->
   <div id="pendingScreen">
-    <div class="win-login-card">
-      <h2>Account in afwachting</h2>
-      <p class="sub">Je account staat op Standby. De beheerder moet eerst toegang geven.</p>
+    <div class="cb-auth-card">
+      <div class="cb-brand-mark">CB</div>
+      <h2>Cloudbeheer — Standby</h2>
+      <p class="sub">Je account is aangemaakt en wacht op goedkeuring van de beheerder.</p>
       <button class="btn btn-danger" style="width:100%;" onclick="logout()">Uitloggen</button>
     </div>
   </div>
 
-  <!-- 2. WINDOWS DESKTOP -->
+  <!-- 2. CLOUDBEHEER DESKTOP -->
   <div id="desktop" onclick="closeStartMenu()">
     <div class="desktop-icons" id="desktopIconsContainer"></div>
   </div>
 
   <!-- STARTMENU -->
   <div id="startMenu" onclick="event.stopPropagation()">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:8px;">
-      <strong style="font-size:0.92rem;" id="startUserLabel">Gebruiker</strong>
+    <div class="start-brand-header">
+      <div>
+        <div style="font-size:0.92rem; font-weight:700; color:#fff;">Cloudbeheer</div>
+        <div style="font-size:0.74rem; color:#94a3b8;" id="startUserLabel">Gebruiker</div>
+      </div>
       <button class="btn btn-danger btn-sm" onclick="logout()">Afmelden</button>
     </div>
-    <div class="start-section-title">Kleine Stamgegevens-Apps (Invoer)</div>
+    <div class="start-section-title">Losse Stamgegevens-Apps</div>
     <div class="start-grid" id="startMicroApps"></div>
-    <div class="start-section-title">Hoofdprogramma's (Samenvoeging)</div>
+    <div class="start-section-title">Hoofdprogramma's</div>
     <div class="start-grid" id="startMainApps"></div>
   </div>
 
   <!-- TAAKBALK -->
   <div id="taskbar">
     <div class="taskbar-left">
-      <button class="start-btn" onclick="event.stopPropagation(); toggleStartMenu()">&#9638; Start</button>
+      <button class="start-btn" onclick="event.stopPropagation(); toggleStartMenu()">&#9638; Cloudbeheer</button>
       <div id="taskbarWindows" style="display:flex; gap:6px; align-items:center;"></div>
     </div>
     <div class="taskbar-tray">
-      <button class="btn btn-secondary btn-sm" onclick="minimizeAllWindows()" title="Bureaublad tonen">Bureaublad</button>
+      <button class="btn btn-secondary btn-sm" onclick="minimizeAllWindows()" title="Alle vensters minimaliseren">Bureaublad</button>
       <span id="trayClock">12:00</span>
     </div>
   </div>
@@ -292,11 +348,11 @@
   <!-- VOCHT HOEVEELHEID POPUP -->
   <div id="vochtPopup">
     <div class="popup-box">
-      <h3 id="popupDrinkName" style="color:#0f172a;">Drankje</h3>
-      <p style="font-size:0.82rem; color:#64748b;">Kies een maat uit <b>Dranken & Maten.exe</b> of vul zelf ml in:</p>
+      <h3 id="popupDrinkName" style="color:var(--cb-text);">Drankje</h3>
+      <p style="font-size:0.8rem; color:var(--cb-muted); margin-top:3px;">Kies een maat uit <b>Dranken & Maten.exe</b> of vul zelf ml in:</p>
       <div class="amt-grid" id="popupAmountsGrid"></div>
       <div style="display:flex; gap:6px; margin-bottom:10px;">
-        <input type="number" id="popupCustomMl" placeholder="Eigen ml..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+        <input type="number" id="popupCustomMl" placeholder="Eigen ml..." style="flex:1; padding:7px 9px; border:1px solid var(--cb-border); border-radius:6px;">
         <button class="btn" onclick="submitCustomVocht()">+ Toevoegen</button>
       </div>
       <button class="btn btn-secondary" style="width:100%;" onclick="closeVochtPopup()">Annuleren</button>
@@ -304,7 +360,6 @@
   </div>
 
 <script>
-  // --- FIREBASE INITIALISATIE ---
   const firebaseConfig = {
     apiKey: "AIzaSyBWaKFaJ1sUhSvXqK2pOCSDwJ3eMqDJag8",
     authDomain: "dialysedbase.firebaseapp.com",
@@ -317,12 +372,10 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  // --- GEDEELDE STATE TUSSEN ALLE MINI-APPS ---
   const state = {
     user: null,
     userData: null,
     isRegister: false,
-    // Stamgegevens (beheerd door de kleine micro-apps)
     dropdowns: { Bedrijf: [], Chauffeur: [], Kenteken: [], Vanaf: [], Naar: [] },
     nurses: ['Marissa', 'Iris', 'Alice', 'Irmee', 'Sandra'],
     agendaSettings: {
@@ -339,7 +392,6 @@
       { name: "Ranja", image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80" }
     ],
     amounts: [75, 150, 200, 250, 300, 500],
-    // Hoofd-data
     ritten: [],
     dialyse: [],
     bp: [],
@@ -354,32 +406,30 @@
     draftLetter: null
   };
 
-  // --- DEFINITIE VAN ALLE LOSSE WINDOWS PROGRAMMAATJES ---
   const APPS = [
     // KLEINE STAMGEGEVENS MICRO-APPS
-    { id: 'app_kentekens', title: 'Kentekens.exe', short: 'Kentekens', type: 'micro', perm: 'ritten', color: '#0284c7', icon: '🚗', w: 420, h: 380 },
-    { id: 'app_chauffeurs', title: 'Chauffeurs.exe', short: 'Chauffeurs', type: 'micro', perm: 'ritten', color: '#0369a1', icon: '🧑‍✈️', w: 420, h: 380 },
-    { id: 'app_bedrijven', title: 'Bedrijven.exe', short: 'Bedrijven', type: 'micro', perm: 'ritten', color: '#1d4ed8', icon: '🏢', w: 420, h: 380 },
-    { id: 'app_locaties', title: 'Locaties.exe', short: 'Locaties', type: 'micro', perm: 'ritten', color: '#2563eb', icon: '📍', w: 450, h: 410 },
-    { id: 'app_verpleging', title: 'Verpleging.exe', short: 'Verpleging', type: 'micro', perm: 'dialyse', color: '#0d9488', icon: '🩺', w: 420, h: 380 },
-    { id: 'app_artsen', title: 'Artsen.exe', short: 'Artsen', type: 'micro', perm: 'agenda', color: '#4f46e5', icon: '👨‍⚕️', w: 420, h: 380 },
-    { id: 'app_dranken', title: 'Dranken & Maten.exe', short: 'Dranken/Maten', type: 'micro', perm: 'vocht', color: '#0891b2', icon: '🥤', w: 520, h: 480 },
+    { id: 'app_kentekens', title: 'Cloudbeheer — Kentekens.exe', short: 'Kentekens', type: 'micro', perm: 'ritten', color: '#0284c7', icon: '🚗', w: 420, h: 380 },
+    { id: 'app_chauffeurs', title: 'Cloudbeheer — Chauffeurs.exe', short: 'Chauffeurs', type: 'micro', perm: 'ritten', color: '#0369a1', icon: '🧑‍✈️', w: 420, h: 380 },
+    { id: 'app_bedrijven', title: 'Cloudbeheer — Bedrijven.exe', short: 'Bedrijven', type: 'micro', perm: 'ritten', color: '#1d4ed8', icon: '🏢', w: 420, h: 380 },
+    { id: 'app_locaties', title: 'Cloudbeheer — Locaties.exe', short: 'Locaties', type: 'micro', perm: 'ritten', color: '#2563eb', icon: '📍', w: 450, h: 410 },
+    { id: 'app_verpleging', title: 'Cloudbeheer — Verpleging.exe', short: 'Verpleging', type: 'micro', perm: 'dialyse', color: '#0d9488', icon: '🩺', w: 420, h: 380 },
+    { id: 'app_artsen', title: 'Cloudbeheer — Artsen.exe', short: 'Artsen', type: 'micro', perm: 'agenda', color: '#4f46e5', icon: '👨‍⚕️', w: 420, h: 380 },
+    { id: 'app_dranken', title: 'Cloudbeheer — Dranken & Maten.exe', short: 'Dranken/Maten', type: 'micro', perm: 'vocht', color: '#0891b2', icon: '🥤', w: 520, h: 480 },
 
     // HOOFD- EN SAMENVOEGPROGRAMMA'S
-    { id: 'app_ritten', title: 'Rittenapp.exe', short: 'Rittenapp', type: 'main', perm: 'ritten', color: '#059669', icon: '🚐', w: 860, h: 560 },
-    { id: 'app_dialyse', title: 'Dialyse Beheer.exe', short: 'Dialyse', type: 'main', perm: 'dialyse', color: '#0f766e', icon: '💉', w: 840, h: 580 },
-    { id: 'app_vocht', title: 'POS Vocht Monitor.exe', short: 'Vocht POS', type: 'main', perm: 'vocht', color: '#0284c7', icon: '💧', w: 760, h: 550 },
-    { id: 'app_bp', title: 'Bloeddruk & Hartslag.exe', short: 'Bloeddruk', type: 'main', perm: 'bloeddruk', color: '#dc2626', icon: '❤️', w: 720, h: 500 },
-    { id: 'app_medicijnen', title: 'Medicijnen.exe', short: 'Medicijnen', type: 'main', perm: 'medicijnen', color: '#7c3aed', icon: '💊', w: 760, h: 530 },
-    { id: 'app_agenda', title: 'Agenda.exe', short: 'Agenda', type: 'main', perm: 'agenda', color: '#1a73e8', icon: '📅', w: 780, h: 540 },
-    { id: 'app_brieven', title: 'Brieven & Mappen.exe', short: 'Brieven', type: 'main', perm: 'brieven', color: '#9333ea', icon: '📁', w: 740, h: 520 },
-    { id: 'app_admin', title: 'Gebruikersbeheer.exe', short: 'Admin Beheer', type: 'main', perm: 'admin', color: '#312e81', icon: '⚙️', w: 820, h: 480 }
+    { id: 'app_ritten', title: 'Cloudbeheer — Rittenapp.exe', short: 'Rittenapp', type: 'main', perm: 'ritten', color: '#059669', icon: '🚐', w: 860, h: 560 },
+    { id: 'app_dialyse', title: 'Cloudbeheer — Dialyse Beheer.exe', short: 'Dialyse', type: 'main', perm: 'dialyse', color: '#0f766e', icon: '💉', w: 840, h: 580 },
+    { id: 'app_vocht', title: 'Cloudbeheer — POS Vocht Monitor.exe', short: 'Vocht POS', type: 'main', perm: 'vocht', color: '#0284c7', icon: '💧', w: 760, h: 550 },
+    { id: 'app_bp', title: 'Cloudbeheer — Bloeddruk & Hartslag.exe', short: 'Bloeddruk', type: 'main', perm: 'bloeddruk', color: '#dc2626', icon: '❤️', w: 720, h: 500 },
+    { id: 'app_medicijnen', title: 'Cloudbeheer — Medicijnen.exe', short: 'Medicijnen', type: 'main', perm: 'medicijnen', color: '#7c3aed', icon: '💊', w: 760, h: 530 },
+    { id: 'app_agenda', title: 'Cloudbeheer — Agenda.exe', short: 'Agenda', type: 'main', perm: 'agenda', color: '#1a73e8', icon: '📅', w: 780, h: 540 },
+    { id: 'app_brieven', title: 'Cloudbeheer — Brieven & Mappen.exe', short: 'Brieven', type: 'main', perm: 'brieven', color: '#9333ea', icon: '📁', w: 740, h: 520 },
+    { id: 'app_admin', title: 'Cloudbeheer — Gebruikersbeheer.exe', short: 'Admin Beheer', type: 'main', perm: 'admin', color: '#312e81', icon: '⚙️', w: 820, h: 480 }
   ];
 
   let openWindows = {};
   let topZ = 100;
 
-  // --- KLOK IN TAAKBALK ---
   setInterval(() => {
     const el = document.getElementById('trayClock');
     if (el) {
@@ -388,7 +438,6 @@
     }
   }, 1000);
 
-  // --- AUTHENTICATIE ---
   auth.onAuthStateChanged(user => {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('pendingScreen').style.display = 'none';
@@ -423,7 +472,7 @@
 
   function toggleRegister() {
     state.isRegister = !state.isRegister;
-    document.getElementById('authHeading').innerText = state.isRegister ? 'Account Registreren' : 'Dialyse & Beheer OS';
+    document.getElementById('authHeading').innerText = state.isRegister ? 'Cloudbeheer Registreren' : 'Cloudbeheer';
     document.getElementById('authBtn').innerText = state.isRegister ? 'Registreren' : 'Inloggen';
     document.getElementById('authSwitchText').innerText = state.isRegister ? 'Al een account? Log hier in' : 'Nog geen account? Registreer hier';
     document.getElementById('authErr').innerText = '';
@@ -459,7 +508,6 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  // --- BUREAUBLAD & DATA LADEN ---
   function initDesktop() {
     document.getElementById('desktop').style.display = 'block';
     document.getElementById('taskbar').style.display = 'flex';
@@ -500,7 +548,6 @@
   function loadAllSharedData() {
     const uid = state.user.uid;
 
-    // 1. Ritten Stamgegevens (Kentekens, Chauffeurs, Bedrijven, Locaties)
     db.collection('ritten_dropdowns').doc(uid).get().then(doc => {
       if (doc.exists) {
         state.dropdowns = { Bedrijf: [], Chauffeur: [], Kenteken: [], Vanaf: [], Naar: [], ...doc.data() };
@@ -513,7 +560,6 @@
       }
     });
 
-    // 2. Verpleging
     db.collection('settings').doc('config').get().then(doc => {
       if (doc.exists && Array.isArray(doc.data().nurses)) {
         state.nurses = doc.data().nurses;
@@ -521,7 +567,6 @@
       }
     });
 
-    // 3. Agenda instellingen (Artsen, Locaties, Categorieën)
     db.collection('agenda_settings').doc(uid).get().then(doc => {
       if (doc.exists) {
         state.agendaSettings = { ...state.agendaSettings, ...doc.data() };
@@ -529,7 +574,6 @@
       }
     });
 
-    // 4. Vocht instellingen (Dranken & Maten)
     db.collection('vocht_settings').doc(uid).get().then(doc => {
       if (doc.exists) {
         if (doc.data().drinks?.length) state.drinks = doc.data().drinks;
@@ -657,7 +701,6 @@
     });
   }
 
-  // --- VENSTERBEHEER (WINDOWS ENGINE) ---
   function toggleStartMenu() {
     const m = document.getElementById('startMenu');
     m.style.display = m.style.display === 'block' ? 'none' : 'block';
@@ -684,8 +727,8 @@
     const maxH = Math.max(260, desk.clientHeight - 20);
     const width = Math.min(app.w, maxW);
     const height = Math.min(app.h, maxH);
-    const left = Math.min(60 + offset, Math.max(8, desk.clientWidth - width - 8));
-    const top = Math.min(20 + offset, Math.max(8, desk.clientHeight - height - 8));
+    const left = Math.min(70 + offset, Math.max(8, desk.clientWidth - width - 8));
+    const top = Math.min(22 + offset, Math.max(8, desk.clientHeight - height - 8));
 
     const win = document.createElement('div');
     win.className = 'win-window active-win';
@@ -793,47 +836,43 @@
     Object.keys(openWindows).forEach(id => renderWindowContent(id));
   }
 
-  // --- RENDER LOGICA PER MICRO-APP & SAMENVOEG-APP ---
   function renderWindowContent(appId) {
     const body = document.getElementById('body_' + appId);
     if (!body) return;
 
-    // 1-3: KLEINE STAMGEGEVENS APPS (Kentekens, Chauffeurs, Bedrijven)
     if (appId === 'app_kentekens') return renderSimpleDropdownMicroApp(body, 'Kenteken', 'Kenteken', 'bijv. 12-ABC-3', 'ritten');
     if (appId === 'app_chauffeurs') return renderSimpleDropdownMicroApp(body, 'Chauffeur', 'Chauffeur', 'bijv. Jan de Vries', 'ritten');
     if (appId === 'app_bedrijven') return renderSimpleDropdownMicroApp(body, 'Bedrijf', 'Bedrijf', 'bijv. Taxibedrijf Noord', 'ritten');
 
-    // 4: LOCATIES MICRO-APP (Vanaf, Naar & Agenda-locaties)
     if (appId === 'app_locaties') {
       const canW = hasPerm('ritten', true) || hasPerm('agenda', true);
       const allLocs = [...new Set([...(state.dropdowns.Vanaf||[]), ...(state.dropdowns.Naar||[]), ...(state.agendaSettings.locations||[])])].sort();
       body.innerHTML = `
         <div class="card-box">
-          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Locaties die je hier toevoegt verschijnen direct in <b>Rittenapp.exe</b> (Vanaf/Naar) en <b>Agenda.exe</b>.</p>
+          <p style="font-size:0.8rem; color:var(--cb-muted); margin-bottom:8px;">Locaties die je hier toevoegt verschijnen direct in <b>Rittenapp.exe</b> en <b>Agenda.exe</b>.</p>
           ${canW ? `
           <div style="display:flex; gap:8px;">
-            <input type="text" id="microLocInput" placeholder="Nieuwe locatie of adres..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <input type="text" id="microLocInput" placeholder="Nieuwe locatie of adres..." style="flex:1; padding:7px 10px; border:1px solid var(--cb-border); border-radius:6px;">
             <button class="btn btn-success" onclick="addSharedLocation()">+ Toevoegen</button>
           </div>` : ''}
         </div>
         <div class="chip-list">
           ${allLocs.map(loc => `
             <span class="data-chip">${loc} ${canW ? `<button onclick="removeSharedLocation('${loc.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
-          `).join('') || '<span style="color:#64748b;">Nog geen locaties.</span>'}
+          `).join('') || '<span style="color:var(--cb-muted);">Nog geen locaties.</span>'}
         </div>
       `;
       return;
     }
 
-    // 5: VERPLEGING MICRO-APP
     if (appId === 'app_verpleging') {
       const canW = hasPerm('dialyse', true);
       body.innerHTML = `
         <div class="card-box">
-          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Verpleegkundigen voor <b>Dialyse Beheer.exe</b>:</p>
+          <p style="font-size:0.8rem; color:var(--cb-muted); margin-bottom:8px;">Verpleegkundigen voor <b>Dialyse Beheer.exe</b>:</p>
           ${canW ? `
           <div style="display:flex; gap:8px;">
-            <input type="text" id="microNurseInput" placeholder="Naam verpleegkundige..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <input type="text" id="microNurseInput" placeholder="Naam verpleegkundige..." style="flex:1; padding:7px 10px; border:1px solid var(--cb-border); border-radius:6px;">
             <button class="btn btn-success" onclick="addMicroNurse()">+ Toevoegen</button>
           </div>` : ''}
         </div>
@@ -846,28 +885,26 @@
       return;
     }
 
-    // 6: ARTSEN MICRO-APP
     if (appId === 'app_artsen') {
       const canW = hasPerm('agenda', true);
       body.innerHTML = `
         <div class="card-box">
-          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Artsen & specialisten voor <b>Agenda.exe</b>:</p>
+          <p style="font-size:0.8rem; color:var(--cb-muted); margin-bottom:8px;">Artsen & specialisten voor <b>Agenda.exe</b>:</p>
           ${canW ? `
           <div style="display:flex; gap:8px;">
-            <input type="text" id="microDocInput" placeholder="Naam arts / nefroloog..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <input type="text" id="microDocInput" placeholder="Naam arts / nefroloog..." style="flex:1; padding:7px 10px; border:1px solid var(--cb-border); border-radius:6px;">
             <button class="btn btn-success" onclick="addMicroDoctor()">+ Toevoegen</button>
           </div>` : ''}
         </div>
         <div class="chip-list">
           ${(state.agendaSettings.doctors || []).map(d => `
             <span class="data-chip">${d} ${canW ? `<button onclick="removeMicroDoctor('${d.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
-          `).join('') || '<span style="color:#64748b;">Nog geen artsen toegevoegd.</span>'}
+          `).join('') || '<span style="color:var(--cb-muted);">Nog geen artsen toegevoegd.</span>'}
         </div>
       `;
       return;
     }
 
-    // 7: DRANKEN & MATEN MICRO-APP
     if (appId === 'app_dranken') {
       const canW = hasPerm('vocht', true);
       body.innerHTML = `
@@ -875,7 +912,7 @@
           <strong>Vaste Hoeveelheden (ml) voor POS Vocht Monitor.exe</strong>
           ${canW ? `
           <div style="display:flex; gap:8px; margin-top:8px;">
-            <input type="number" id="microAmtInput" placeholder="bijv. 250" style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <input type="number" id="microAmtInput" placeholder="bijv. 250" style="flex:1; padding:7px 10px; border:1px solid var(--cb-border); border-radius:6px;">
             <button class="btn btn-success" onclick="addMicroAmount()">+ Maat</button>
           </div>` : ''}
           <div class="chip-list">
@@ -897,7 +934,7 @@
             <tbody>
               ${state.drinks.map((dr, idx) => `
                 <tr>
-                  <td><img src="${dr.image}" style="width:36px; height:36px; object-fit:cover; border-radius:4px;" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80'"></td>
+                  <td><img src="${dr.image}" style="width:36px; height:36px; object-fit:cover; border-radius:5px;" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80'"></td>
                   <td><b>${dr.name}</b></td>
                   <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="removeMicroDrink(${idx})">Verwijder</button>` : '-'}</td>
                 </tr>
@@ -909,7 +946,6 @@
       return;
     }
 
-    // 8: RITTENAPP (VOEGT BEDRIJF, CHAUFFEUR, KENTEKEN, LOCATIE SAMEN)
     if (appId === 'app_ritten') {
       const canW = hasPerm('ritten', true);
       const bedrijven = (state.dropdowns.Bedrijf || []).slice().sort();
@@ -932,19 +968,19 @@
         ${canW ? `
         <form class="card-box" onsubmit="saveRitFromApp(event)">
           <div class="grid-2">
-            <div class="field"><label>Bedrijf (uit Bedrijven.exe)</label>
+            <div class="field"><label>Bedrijf (Bedrijven.exe)</label>
               <select id="rit_bedrijf" required><option value="">-- Kies --</option>${bedrijven.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
             </div>
-            <div class="field"><label>Chauffeur (uit Chauffeurs.exe)</label>
+            <div class="field"><label>Chauffeur (Chauffeurs.exe)</label>
               <select id="rit_chauffeur" required><option value="">-- Kies --</option>${chauffeurs.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
             </div>
-            <div class="field"><label>Kenteken (uit Kentekens.exe)</label>
+            <div class="field"><label>Kenteken (Kentekens.exe)</label>
               <select id="rit_kenteken" required><option value="">-- Kies --</option>${kentekens.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
             </div>
-            <div class="field"><label>Vanaf (uit Locaties.exe)</label>
+            <div class="field"><label>Vanaf (Locaties.exe)</label>
               <select id="rit_vanaf" required><option value="">-- Kies --</option>${vanafs.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
             </div>
-            <div class="field"><label>Naar (uit Locaties.exe)</label>
+            <div class="field"><label>Naar (Locaties.exe)</label>
               <select id="rit_naar" required><option value="">-- Kies --</option>${naars.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
             </div>
             <div class="field"><label>Afspraak Tijd</label><input type="datetime-local" id="rit_afspraak" required></div>
@@ -976,7 +1012,6 @@
       return;
     }
 
-    // 9: DIALYSE BEHEER (VOEGT VERPLEGING SAMEN + UF KLEURCODERING)
     if (appId === 'app_dialyse') {
       const canW = hasPerm('dialyse', true);
       const dryW = getLatestDryWeight();
@@ -1005,8 +1040,8 @@
             <div class="field"><label>UF Ingesteld (L)</label><input type="number" step="0.1" id="dia_uf_set"></div>
           </div>
           <div class="field" style="margin-bottom:8px;">
-            <label>Verpleging (uit Verpleging.exe)</label>
-            <div style="display:flex; flex-wrap:wrap; gap:10px; padding:6px; background:#fff; border:1px solid #cbd5e1; border-radius:5px;">
+            <label>Verpleging (Verpleging.exe)</label>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; padding:7px; background:#fff; border:1px solid var(--cb-border); border-radius:6px;">
               ${state.nurses.map(n => `<label style="display:flex; align-items:center; gap:4px; font-weight:normal;"><input type="checkbox" class="dia_nurse_chk" value="${n}"> ${n}</label>`).join('')}
             </div>
           </div>
@@ -1037,7 +1072,6 @@
       return;
     }
 
-    // 10: POS VOCHT MONITOR (VOEGT DRANKEN & MATEN SAMEN)
     if (appId === 'app_vocht') {
       const canW = hasPerm('vocht', true);
       const todayKey = getLocalDateKey();
@@ -1054,7 +1088,7 @@
 
       body.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
-          <span style="font-size:0.8rem; color:#475569;">Cyclus sinds dialysedag ${resetDt.toLocaleDateString('nl-NL')} 22:30</span>
+          <span style="font-size:0.8rem; color:var(--cb-muted);">Cyclus sinds dialysedag ${resetDt.toLocaleDateString('nl-NL')} 22:30</span>
           <button class="btn btn-sm btn-secondary" onclick="launchApp('app_dranken')">+ Dranken & Maten.exe</button>
         </div>
 
@@ -1097,7 +1131,6 @@
       return;
     }
 
-    // 11: BLOEDDRUK & HARTSLAG
     if (appId === 'app_bp') {
       const canW = hasPerm('bloeddruk', true);
       body.innerHTML = `
@@ -1133,7 +1166,6 @@
       return;
     }
 
-    // 12: MEDICIJNEN
     if (appId === 'app_medicijnen') {
       const canW = hasPerm('medicijnen', true);
       const blocks = [
@@ -1156,7 +1188,7 @@
                     <input type="checkbox" ${taken?'checked':''} ${canW?'':'disabled'} onchange="toggleMedCheck('${m.id}','${b.k}',this.checked)">
                     <span><b>${m.name}</b> (${m.dosage||''})</span>
                   </label>`;
-                }).join('') || '<span style="font-size:0.78rem; color:#64748b;">Geen medicijnen</span>'}
+                }).join('') || '<span style="font-size:0.78rem; color:var(--cb-muted);">Geen medicijnen</span>'}
               </div>
             </div>`;
           }).join('')}
@@ -1180,7 +1212,6 @@
       return;
     }
 
-    // 13: AGENDA (VOEGT ARTSEN & LOCATIES SAMEN)
     if (appId === 'app_agenda') {
       const canW = hasPerm('agenda', true);
       const docs = (state.agendaSettings.doctors || []).slice().sort();
@@ -1195,10 +1226,10 @@
           <div class="grid-2">
             <div class="field"><label>Titel</label><input type="text" id="ag_title" required placeholder="Controle Nefroloog"></div>
             <div class="field"><label>Start</label><input type="datetime-local" id="ag_start" required></div>
-            <div class="field"><label>Arts (uit Artsen.exe)</label>
+            <div class="field"><label>Arts (Artsen.exe)</label>
               <select id="ag_doc"><option value="">-- Geen --</option>${docs.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
             </div>
-            <div class="field"><label>Locatie (uit Locaties.exe)</label>
+            <div class="field"><label>Locatie (Locaties.exe)</label>
               <select id="ag_loc"><option value="">-- Geen --</option>${locs.map(l=>`<option value="${l}">${l}</option>`).join('')}</select>
             </div>
           </div>
@@ -1222,7 +1253,6 @@
       return;
     }
 
-    // 14: BRIEVEN & MAPPEN
     if (appId === 'app_brieven') {
       const canW = hasPerm('brieven', true);
       body.innerHTML = `
@@ -1257,7 +1287,6 @@
       return;
     }
 
-    // 15: ADMIN GEBRUIKERSBEHEER
     if (appId === 'app_admin') {
       body.innerHTML = `
         <table>
@@ -1284,25 +1313,24 @@
     }
   }
 
-  // --- HELPER VOOR KLEINE DROPDOWN MICRO-APPS (KENTEKENS, CHAUFFEURS, BEDRIJVEN) ---
   function renderSimpleDropdownMicroApp(body, categoryKey, label, placeholder, permKey) {
     const canW = hasPerm(permKey, true);
     const items = (state.dropdowns[categoryKey] || []).slice().sort();
     body.innerHTML = `
       <div class="card-box">
-        <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
+        <p style="font-size:0.8rem; color:var(--cb-muted); margin-bottom:8px;">
           Beheer hier alle <b>${label.toLowerCase()}s</b>. Zodra je er één toevoegt, staat hij direct klaar in <b>Rittenapp.exe</b>.
         </p>
         ${canW ? `
         <div style="display:flex; gap:8px;">
-          <input type="text" id="microInp_${categoryKey}" placeholder="${placeholder}" style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+          <input type="text" id="microInp_${categoryKey}" placeholder="${placeholder}" style="flex:1; padding:7px 10px; border:1px solid var(--cb-border); border-radius:6px;">
           <button class="btn btn-success" onclick="addDropdownMicroItem('${categoryKey}')">+ Toevoegen</button>
         </div>` : ''}
       </div>
       <div class="chip-list">
         ${items.map(val => `
           <span class="data-chip">${val} ${canW ? `<button onclick="removeDropdownMicroItem('${categoryKey}', '${val.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
-        `).join('') || `<span style="color:#64748b;">Nog geen ${label.toLowerCase()}s ingevuld.</span>`}
+        `).join('') || `<span style="color:var(--cb-muted);">Nog geen ${label.toLowerCase()}s ingevuld.</span>`}
       </div>
     `;
   }
@@ -1398,7 +1426,6 @@
     db.collection('vocht_settings').doc(state.user.uid).set({ drinks: state.drinks, amounts: state.amounts }, { merge: true }).then(() => refreshAllOpenWindows());
   }
 
-  // --- ACTIES VAN DE HOOFDPROGRAMMA'S ---
   function saveRitFromApp(e) {
     e.preventDefault();
     db.collection('ritten').add({
@@ -1422,7 +1449,7 @@
     const ws = XLSX.utils.json_to_sheet(state.ritten);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Ritten');
-    XLSX.writeFile(wb, 'Ritten_Overzicht.xlsx');
+    XLSX.writeFile(wb, 'Cloudbeheer_Ritten.xlsx');
   }
 
   function getLatestDryWeight() {
@@ -1468,7 +1495,7 @@
     const ws = XLSX.utils.json_to_sheet(state.dialyse);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Dialyse');
-    XLSX.writeFile(wb, 'Dialyse_Overzicht.xlsx');
+    XLSX.writeFile(wb, 'Cloudbeheer_Dialyse.xlsx');
   }
 
   function getDialyseResetDate() {
