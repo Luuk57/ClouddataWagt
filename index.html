@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b192c" />
-  <title>Cloudsysteem Wagt 2026 — Windows Server Shell</title>
+  <title>Cloudsysteem Wagt 2026 — Online Database Server</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     * { box-sizing: border-box; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
@@ -31,9 +31,14 @@
       background: #1d4ed8; color: #fff; font-size: 0.75rem;
       padding: 2px 8px; border-radius: 4px; letter-spacing: 0.04em;
     }
-    .server-meta { font-size: 0.85rem; color: #94a3b8; }
+    .live-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #064e3b; color: #6ee7b7; border: 1px solid #10b981;
+      padding: 2px 8px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
+    }
+    .server-meta { font-size: 0.85rem; color: #94a3b8; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-    .desktop-wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px; }
+    .desktop-wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px; }
 
     .window {
       background: #102036;
@@ -68,10 +73,11 @@
     button:hover { background: #1d4ed8; }
     button.secondary { background: #1e3352; border-color: #3b6094; }
     button.secondary:hover { background: #294670; }
+    button.small-btn { padding: 6px 10px; font-size: 0.84rem; width: auto; }
     button.danger { background: #991b1b; border-color: #dc2626; padding: 6px 10px; font-size: 0.84rem; width: auto; }
     button.danger:hover { background: #b91c1c; }
 
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .row > * { flex: 1; min-width: 150px; }
     .hidden { display: none; }
@@ -85,10 +91,13 @@
     .checkbox-row input { width: auto; margin: 0; }
     .checkbox-row label { margin: 0; }
 
-    .user-item, .log-item {
+    .user-item, .log-item, .db-record {
       border-top: 1px solid #233b5c; padding-top: 10px; margin-top: 10px;
     }
-    .log-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .log-item, .db-record {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .btn-group { display: flex; gap: 6px; align-items: center; }
 
     .progress-box { margin-bottom: 14px; }
     .progress-header {
@@ -102,6 +111,12 @@
     .progress-fill {
       height: 100%; width: 0%; background: #22c55e;
       transition: width 0.25s ease, background-color 0.25s ease;
+    }
+
+    pre.json-box {
+      background: #07101d; border: 1px solid #233b5c; border-radius: 4px;
+      padding: 10px; margin: 6px 0 0; font-size: 0.8rem; color: #bae6fd;
+      overflow-x: auto; white-space: pre-wrap; word-break: break-word;
     }
 
     .taskbar {
@@ -127,18 +142,22 @@
     <div class="server-brand">
       <span class="server-tag">WIN-SRV-2026</span>
       <span id="serverTitleText">Cloudsysteem Wagt 2026</span>
+      <span id="liveDbBadge" class="live-pill hidden">LIVE DB</span>
     </div>
-    <div class="server-meta" id="serverConnStatus">GitHub Pages &amp; Firestore</div>
+    <div class="server-meta">
+      <span id="dbStatsText">Firestore: cloudsysteem-wagt-2026</span>
+      <span id="serverConnStatus">GitHub &amp; Firestore</span>
+    </div>
   </header>
 
   <main class="desktop-wrap">
     <section id="loginSection" class="window" style="max-width: 520px; margin: 24px auto;">
       <div class="window-titlebar">
-        <span>Windows Server Aanmelding — Cloudsysteem Wagt 2026</span>
+        <span>Windows Server Aanmelding — Online Database</span>
         <span class="badge">AUTH</span>
       </div>
       <div class="window-body">
-        <p class="muted">Log in met jouw account om de server-schil en toegewezen modules te openen.</p>
+        <p class="muted">Log in om live verbinding te maken met de Cloud Firestore-database.</p>
         <form id="loginForm">
           <label for="emailInput">E-mailadres</label>
           <input id="emailInput" type="email" required placeholder="naam@voorbeeld.nl" />
@@ -146,7 +165,7 @@
           <label for="passwordInput">Wachtwoord</label>
           <input id="passwordInput" type="password" required placeholder="••••••••" />
 
-          <button type="submit">Aanmelden op server-schil</button>
+          <button type="submit">Aanmelden op database-server</button>
         </form>
         <div id="loginStatusMsg" class="status"></div>
       </div>
@@ -161,7 +180,7 @@
         <div class="window-body">
           <div class="row">
             <div>
-              <div id="appBanner">Actief verbonden met Firebase.</div>
+              <div id="appBanner">Live verbonden met Cloud Firestore.</div>
               <div id="statusMsg" class="status"></div>
             </div>
             <div style="max-width: 170px;">
@@ -172,10 +191,11 @@
       </div>
 
       <div class="grid-2">
+        <!-- Venster: Vocht Intake (24u & 48u live via Firestore) -->
         <div id="moduleFluid" class="window hidden">
           <div class="window-titlebar">
             <span>Vocht Intake — 24u / 48u (tussen 2 dialyses)</span>
-            <span class="badge">VOCHT</span>
+            <span class="badge">LIVE DB</span>
           </div>
           <div class="window-body">
             <div class="progress-box">
@@ -209,14 +229,15 @@
                   <input id="fluidNoteInput" type="text" placeholder="bijv. water, koffie" />
                 </div>
               </div>
-              <button type="submit">Vocht toevoegen</button>
+              <button type="submit">Record wegschrijven naar database</button>
             </form>
 
-            <h3 style="margin-top: 18px; margin-bottom: 6px;">Recente invoer (48 uur)</h3>
+            <h3 style="margin-top: 18px; margin-bottom: 6px;">Database-records (laatste 48 uur)</h3>
             <div id="fluidHistoryList">Laden...</div>
           </div>
         </div>
 
+        <!-- Venster: Overzichten & Modules -->
         <div class="window">
           <div class="window-titlebar">
             <span>Servermodules &amp; Rechten</span>
@@ -233,10 +254,11 @@
         </div>
       </div>
 
+      <!-- Venster: Serverbeheer, Rechten & Live Database Explorer -->
       <div id="adminSection" class="window hidden">
         <div class="window-titlebar">
-          <span>Serverbeheer &amp; Rechtenbeheer (Admin)</span>
-          <span class="badge">ADMIN</span>
+          <span>Serverbeheer, Rechten &amp; Online Database Explorer (Admin)</span>
+          <span class="badge">ADMIN DB</span>
         </div>
         <div class="window-body">
           <div class="grid-2">
@@ -264,11 +286,20 @@
 
                 <button type="submit">Serverinstellingen opslaan</button>
               </form>
+
+              <h3 style="margin-top: 22px;">Gebruikers &amp; rechten (<code>users</code>)</h3>
+              <div id="usersList">Gebruikers laden...</div>
             </div>
 
             <div>
-              <h3>Gebruikers &amp; rechten (<code>users</code>)</h3>
-              <div id="usersList">Gebruikers laden...</div>
+              <h3>Live Database Explorer</h3>
+              <label for="dbCollectionSelect">Collectie bekijken</label>
+              <select id="dbCollectionSelect">
+                <option value="fluidIntake">fluidIntake (vochtrecords)</option>
+                <option value="users">users (gebruikers &amp; rechten)</option>
+                <option value="settings">settings (systeeminstellingen)</option>
+              </select>
+              <div id="dbExplorerList">Database-records laden...</div>
             </div>
           </div>
         </div>
@@ -280,7 +311,7 @@
     <div class="taskbar-left">
       <button type="button" id="focusTopBtn" class="start-btn">Server</button>
       <button type="button" id="focusFluidBtn" class="task-pill">Vocht 24u/48u</button>
-      <button type="button" id="focusAdminBtn" class="task-pill hidden">Admin</button>
+      <button type="button" id="focusAdminBtn" class="task-pill hidden">Admin DB</button>
     </div>
     <div class="task-clock" id="taskbarClock">--:--</div>
   </footer>
