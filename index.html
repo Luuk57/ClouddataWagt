@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dialyse & Beheer OS (Windows Desktop)</title>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- SheetJS voor Excel Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --win-blue: #0078d4;
+      --win-blue-dark: #005a9e;
+      --win-taskbar: rgba(24, 28, 36, 0.94);
+      --win-start: rgba(32, 36, 46, 0.97);
+      --win-titlebar: #e5eef8;
+      --win-titlebar-active: #0067c0;
+      --win-border: #94a3b8;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0f172a; user-select: none; }
+
+    /* LOGIN & STANDBY SCHERM */
+    #loginScreen, #pendingScreen {
+      position: fixed; inset: 0; z-index: 99999;
+      background: radial-gradient(circle at 30% 20%, #1e40af, #0f172a 75%);
+      display: none; justify-content: center; align-items: center; padding: 20px;
+    }
+    .win-login-card {
+      background: rgba(255, 255, 255, 0.96); width: 100%; max-width: 380px;
+      border-radius: 12px; padding: 28px; box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+      text-align: center; user-select: text;
+    }
+    .win-login-card h2 { color: #0f172a; margin-bottom: 6px; font-size: 1.35rem; }
+    .win-login-card p.sub { color: #64748b; font-size: 0.85rem; margin-bottom: 18px; }
+    .form-row { text-align: left; margin-bottom: 12px; }
+    .form-row label { display: block; font-size: 0.8rem; font-weight: 600; color: #334155; margin-bottom: 4px; }
+    .form-row input { width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+
+    /* WINDOWS DESKTOP ACHTERGROND */
+    #desktop {
+      position: relative; width: 100%; height: calc(100vh - 46px);
+      background: linear-gradient(135deg, #004e92 0%, #000428 100%);
+      overflow: hidden; display: none;
+    }
+
+    /* BUREAUBLAD ICONEN RASTER (KOLOMMEN VAN BOVEN NAAR BENEDEN) */
+    .desktop-icons {
+      display: flex; flex-direction: column; flex-wrap: wrap;
+      align-content: flex-start; gap: 8px; padding: 14px;
+      height: 100%; width: fit-content;
+    }
+    .desktop-icon {
+      width: 92px; padding: 8px 4px; border-radius: 6px;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: pointer; border: 1px solid transparent; color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.85); transition: background 0.15s;
+    }
+    .desktop-icon:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.35); }
+    .desktop-icon:active { background: rgba(255, 255, 255, 0.28); }
+    .icon-badge {
+      width: 42px; height: 42px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; font-weight: bold; color: #fff;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+    }
+    .desktop-icon span {
+      font-size: 0.74rem; text-align: center; line-height: 1.15;
+      word-break: break-word; max-width: 86px;
+    }
+    .micro-tag {
+      font-size: 0.62rem; background: rgba(0,0,0,0.45); padding: 1px 5px;
+      border-radius: 4px; color: #bae6fd; margin-top: -2px;
+    }
+
+    /* WINDOWS VENSTERS */
+    .win-window {
+      position: absolute; background: #f8fafc;
+      border: 1px solid #475569; border-radius: 8px;
+      box-shadow: 0 14px 38px rgba(0,0,0,0.45);
+      display: flex; flex-direction: column; overflow: hidden;
+      min-width: 310px; min-height: 220px;
+      resize: both; user-select: text;
+    }
+    .win-window.minimized { display: none !important; }
+    .win-window.maximized {
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
+      border-radius: 0; resize: none;
+    }
+
+    .win-titlebar {
+      height: 34px; background: var(--win-titlebar); color: #1e293b;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 6px 0 10px; cursor: move; flex-shrink: 0;
+      border-bottom: 1px solid #cbd5e1; user-select: none;
+    }
+    .win-window.active-win .win-titlebar {
+      background: var(--win-titlebar-active); color: #ffffff;
+    }
+    .win-title-left { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; font-weight: 600; overflow: hidden; white-space: nowrap; }
+    .win-controls { display: flex; height: 100%; }
+    .win-ctrl-btn {
+      width: 36px; height: 100%; border: none; background: transparent;
+      color: inherit; font-size: 0.95rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .win-ctrl-btn:hover { background: rgba(255,255,255,0.2); }
+    .win-ctrl-btn.close:hover { background: #e81123; color: #fff; }
+
+    .win-body {
+      flex: 1; overflow-y: auto; overflow-x: auto; padding: 14px;
+      background: #ffffff; font-size: 0.88rem; color: #1e293b;
+    }
+
+    /* WINDOWS TAAKBALK & STARTMENU */
+    #taskbar {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 46px;
+      background: var(--win-taskbar); border-top: 1px solid rgba(255,255,255,0.14);
+      display: none; align-items: center; justify-content: space-between;
+      padding: 0 10px; z-index: 9000; color: #fff;
+    }
+    .taskbar-left { display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1; padding-right: 10px; }
+    .start-btn {
+      background: var(--win-blue); color: #fff; border: none; border-radius: 5px;
+      padding: 6px 14px; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+    }
+    .start-btn:hover { background: #1084e0; }
+    .task-item {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+      color: #e2e8f0; padding: 5px 11px; border-radius: 4px; font-size: 0.8rem;
+      cursor: pointer; white-space: nowrap; max-width: 170px; overflow: hidden; text-overflow: ellipsis;
+    }
+    .task-item.active { background: rgba(255,255,255,0.26); border-bottom: 3px solid #38bdf8; color: #fff; font-weight: 600; }
+    .taskbar-tray { display: flex; align-items: center; gap: 12px; font-size: 0.78rem; color: #cbd5e1; flex-shrink: 0; }
+
+    #startMenu {
+      position: fixed; bottom: 50px; left: 10px; width: 340px; max-width: calc(100vw - 20px);
+      background: var(--win-start); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px; padding: 14px; z-index: 9500; color: #fff;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.6); display: none;
+    }
+    .start-section-title { font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; margin: 10px 0 6px 0; letter-spacing: 0.5px; }
+    .start-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .start-app-btn {
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.08);
+      color: #f1f5f9; padding: 7px 9px; border-radius: 6px; text-align: left;
+      font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 7px;
+    }
+    .start-app-btn:hover { background: rgba(255,255,255,0.18); }
+
+    /* INTERNE UI ELEMENTEN BINNEN VENSTERS */
+    .btn { background: var(--win-blue); color: #fff; border: none; padding: 7px 13px; border-radius: 5px; font-size: 0.84rem; font-weight: 600; cursor: pointer; }
+    .btn:hover { background: var(--win-blue-dark); }
+    .btn-success { background: var(--success); }
+    .btn-danger { background: var(--danger); }
+    .btn-warning { background: var(--warning); color: #000; }
+    .btn-secondary { background: #64748b; }
+    .btn-sm { padding: 4px 9px; font-size: 0.78rem; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 10px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 0.78rem; font-weight: 600; color: #334155; }
+    .field input, .field select, .field textarea { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 0.86rem; background: #fff; }
+    .readonly { background: #f1f5f9 !important; font-weight: 700; }
+
+    .card-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .chip-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+    .data-chip {
+      background: #e0f2fe; border: 1px solid #7dd3fc; color: #0369a1;
+      padding: 5px 10px; border-radius: 999px; font-size: 0.82rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .data-chip button { background: none; border: none; color: #dc2626; font-weight: bold; cursor: pointer; font-size: 0.95rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
+    th, td { border: 1px solid #e2e8f0; padding: 7px 8px; text-align: left; }
+    th { background: #1e293b; color: #fff; }
+    tr:nth-child(even) { background: #f8fafc; }
+
+    .badge { padding: 2px 7px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; color: #fff; display: inline-block; }
+    .bg-green { background: #16a34a; }
+    .bg-orange { background: #f59e0b; color: #000; }
+    .bg-red { background: #dc2626; }
+    .bg-blue { background: #0284c7; }
+    .bg-gray { background: #64748b; }
+
+    /* UF KLEURCODES */
+    .uf-green { background: #dcfce7 !important; color: #166534 !important; border-color: #86efac !important; }
+    .uf-orange { background: #fef3c7 !important; color: #92400e !important; border-color: #fcd34d !important; }
+    .uf-red { background: #fee2e2 !important; color: #991b1b !important; border-color: #fca5a5 !important; }
+
+    /* VOCHT POS TEGELS & BALKEN */
+    .bar-wrap { background: #e2e8f0; border-radius: 7px; padding: 10px; margin-bottom: 10px; }
+    .bar-track { width: 100%; height: 16px; background: #cbd5e1; border-radius: 8px; overflow: hidden; margin-top: 5px; }
+    .bar-fill { height: 100%; width: 0%; background: #16a34a; transition: width 0.25s; }
+    .pos-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 8px; }
+    .pos-btn {
+      background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px;
+      text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    }
+    .pos-btn:hover { border-color: var(--win-blue); background: #eff6ff; }
+    .pos-btn img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; }
+    .pos-btn span { font-size: 0.78rem; font-weight: 600; }
+
+    /* SUBTABS IN VENSTERS */
+    .win-tabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; flex-wrap: wrap; }
+    .win-tab { background: #e2e8f0; border: none; padding: 5px 11px; border-radius: 5px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .win-tab.active { background: var(--win-blue); color: #fff; }
+
+    /* MODAL BINNEN DESKTOP */
+    #vochtPopup {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9800;
+      display: none; justify-content: center; align-items: center; padding: 15px;
+    }
+    .popup-box { background: #fff; border-radius: 10px; padding: 20px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .amt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+  <!-- 1. INLOGSCHERM -->
+  <div id="loginScreen">
+    <div class="win-login-card">
+      <h2 id="authHeading">Dialyse & Beheer OS</h2>
+      <p class="sub">Log in om je Windows-werkomgeving te starten</p>
+      <div class="form-row">
+        <label>E-mailadres</label>
+        <input type="email" id="loginEmail" placeholder="naam@voorbeeld.nl">
+      </div>
+      <div class="form-row">
+        <label>Wachtwoord</label>
+        <input type="password" id="loginPass" placeholder="••••••••">
+      </div>
+      <button class="btn" style="width:100%; margin-top:6px;" id="authBtn" onclick="submitAuth()">Inloggen</button>
+      <p style="margin-top:12px; font-size:0.82rem; color:#0067c0; cursor:pointer;" onclick="toggleRegister()">
+        <span id="authSwitchText">Nog geen account? Registreer hier</span>
+      </p>
+      <p id="authErr" style="color:#dc2626; font-size:0.8rem; margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <!-- 1B. STANDBY SCHERM -->
+  <div id="pendingScreen">
+    <div class="win-login-card">
+      <h2>Account in afwachting</h2>
+      <p class="sub">Je account staat op Standby. De beheerder moet eerst toegang geven.</p>
+      <button class="btn btn-danger" style="width:100%;" onclick="logout()">Uitloggen</button>
+    </div>
+  </div>
+
+  <!-- 2. WINDOWS DESKTOP -->
+  <div id="desktop" onclick="closeStartMenu()">
+    <div class="desktop-icons" id="desktopIconsContainer"></div>
+  </div>
+
+  <!-- STARTMENU -->
+  <div id="startMenu" onclick="event.stopPropagation()">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:8px;">
+      <strong style="font-size:0.92rem;" id="startUserLabel">Gebruiker</strong>
+      <button class="btn btn-danger btn-sm" onclick="logout()">Afmelden</button>
+    </div>
+    <div class="start-section-title">Kleine Stamgegevens-Apps (Invoer)</div>
+    <div class="start-grid" id="startMicroApps"></div>
+    <div class="start-section-title">Hoofdprogramma's (Samenvoeging)</div>
+    <div class="start-grid" id="startMainApps"></div>
+  </div>
+
+  <!-- TAAKBALK -->
+  <div id="taskbar">
+    <div class="taskbar-left">
+      <button class="start-btn" onclick="event.stopPropagation(); toggleStartMenu()">&#9638; Start</button>
+      <div id="taskbarWindows" style="display:flex; gap:6px; align-items:center;"></div>
+    </div>
+    <div class="taskbar-tray">
+      <button class="btn btn-secondary btn-sm" onclick="minimizeAllWindows()" title="Bureaublad tonen">Bureaublad</button>
+      <span id="trayClock">12:00</span>
+    </div>
+  </div>
+
+  <!-- VOCHT HOEVEELHEID POPUP -->
+  <div id="vochtPopup">
+    <div class="popup-box">
+      <h3 id="popupDrinkName" style="color:#0f172a;">Drankje</h3>
+      <p style="font-size:0.82rem; color:#64748b;">Kies een maat uit <b>Dranken & Maten.exe</b> of vul zelf ml in:</p>
+      <div class="amt-grid" id="popupAmountsGrid"></div>
+      <div style="display:flex; gap:6px; margin-bottom:10px;">
+        <input type="number" id="popupCustomMl" placeholder="Eigen ml..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+        <button class="btn" onclick="submitCustomVocht()">+ Toevoegen</button>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;" onclick="closeVochtPopup()">Annuleren</button>
+    </div>
+  </div>
+
+<script>
+  // --- FIREBASE INITIALISATIE ---
+  const firebaseConfig = {
+    apiKey: "AIzaSyBWaKFaJ1sUhSvXqK2pOCSDwJ3eMqDJag8",
+    authDomain: "dialysedbase.firebaseapp.com",
+    projectId: "dialysedbase",
+    storageBucket: "dialysedbase.firebasestorage.app",
+    messagingSenderId: "36507381882",
+    appId: "1:36507381882:web:6cf9725f87c963c51ccbc3"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // --- GEDEELDE STATE TUSSEN ALLE MINI-APPS ---
+  const state = {
+    user: null,
+    userData: null,
+    isRegister: false,
+    // Stamgegevens (beheerd door de kleine micro-apps)
+    dropdowns: { Bedrijf: [], Chauffeur: [], Kenteken: [], Vanaf: [], Naar: [] },
+    nurses: ['Marissa', 'Iris', 'Alice', 'Irmee', 'Sandra'],
+    agendaSettings: {
+      categories: ['Dialyse', 'Ziekenhuis / Arts', 'INR / Bloedprikken', 'Overig'],
+      doctors: [],
+      locations: ['DKE Boermarkeweg 60 Emmen']
+    },
+    drinks: [
+      { name: "Cappuccino", image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=300&q=80" },
+      { name: "Koffie", image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=300&q=80" },
+      { name: "Thee", image: "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80" },
+      { name: "Water", image: "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80" },
+      { name: "Cola", image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=300&q=80" },
+      { name: "Ranja", image: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=300&q=80" }
+    ],
+    amounts: [75, 150, 200, 250, 300, 500],
+    // Hoofd-data
+    ritten: [],
+    dialyse: [],
+    bp: [],
+    vochtAll: [],
+    medicines: [],
+    medIntakeToday: {},
+    agenda: [],
+    brieven: [],
+    folders: ['Algemeen', 'Dialyse & Ziekenhuis', 'Verzekering'],
+    usersList: [],
+    selectedDrink: null,
+    draftLetter: null
+  };
+
+  // --- DEFINITIE VAN ALLE LOSSE WINDOWS PROGRAMMAATJES ---
+  const APPS = [
+    // KLEINE STAMGEGEVENS MICRO-APPS
+    { id: 'app_kentekens', title: 'Kentekens.exe', short: 'Kentekens', type: 'micro', perm: 'ritten', color: '#0284c7', icon: '🚗', w: 420, h: 380 },
+    { id: 'app_chauffeurs', title: 'Chauffeurs.exe', short: 'Chauffeurs', type: 'micro', perm: 'ritten', color: '#0369a1', icon: '🧑‍✈️', w: 420, h: 380 },
+    { id: 'app_bedrijven', title: 'Bedrijven.exe', short: 'Bedrijven', type: 'micro', perm: 'ritten', color: '#1d4ed8', icon: '🏢', w: 420, h: 380 },
+    { id: 'app_locaties', title: 'Locaties.exe', short: 'Locaties', type: 'micro', perm: 'ritten', color: '#2563eb', icon: '📍', w: 450, h: 410 },
+    { id: 'app_verpleging', title: 'Verpleging.exe', short: 'Verpleging', type: 'micro', perm: 'dialyse', color: '#0d9488', icon: '🩺', w: 420, h: 380 },
+    { id: 'app_artsen', title: 'Artsen.exe', short: 'Artsen', type: 'micro', perm: 'agenda', color: '#4f46e5', icon: '👨‍⚕️', w: 420, h: 380 },
+    { id: 'app_dranken', title: 'Dranken & Maten.exe', short: 'Dranken/Maten', type: 'micro', perm: 'vocht', color: '#0891b2', icon: '🥤', w: 520, h: 480 },
+
+    // HOOFD- EN SAMENVOEGPROGRAMMA'S
+    { id: 'app_ritten', title: 'Rittenapp.exe', short: 'Rittenapp', type: 'main', perm: 'ritten', color: '#059669', icon: '🚐', w: 860, h: 560 },
+    { id: 'app_dialyse', title: 'Dialyse Beheer.exe', short: 'Dialyse', type: 'main', perm: 'dialyse', color: '#0f766e', icon: '💉', w: 840, h: 580 },
+    { id: 'app_vocht', title: 'POS Vocht Monitor.exe', short: 'Vocht POS', type: 'main', perm: 'vocht', color: '#0284c7', icon: '💧', w: 760, h: 550 },
+    { id: 'app_bp', title: 'Bloeddruk & Hartslag.exe', short: 'Bloeddruk', type: 'main', perm: 'bloeddruk', color: '#dc2626', icon: '❤️', w: 720, h: 500 },
+    { id: 'app_medicijnen', title: 'Medicijnen.exe', short: 'Medicijnen', type: 'main', perm: 'medicijnen', color: '#7c3aed', icon: '💊', w: 760, h: 530 },
+    { id: 'app_agenda', title: 'Agenda.exe', short: 'Agenda', type: 'main', perm: 'agenda', color: '#1a73e8', icon: '📅', w: 780, h: 540 },
+    { id: 'app_brieven', title: 'Brieven & Mappen.exe', short: 'Brieven', type: 'main', perm: 'brieven', color: '#9333ea', icon: '📁', w: 740, h: 520 },
+    { id: 'app_admin', title: 'Gebruikersbeheer.exe', short: 'Admin Beheer', type: 'main', perm: 'admin', color: '#312e81', icon: '⚙️', w: 820, h: 480 }
+  ];
+
+  let openWindows = {};
+  let topZ = 100;
+
+  // --- KLOK IN TAAKBALK ---
+  setInterval(() => {
+    const el = document.getElementById('trayClock');
+    if (el) {
+      const now = new Date();
+      el.innerText = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) + '  ' + now.toLocaleDateString('nl-NL');
+    }
+  }, 1000);
+
+  // --- AUTHENTICATIE ---
+  auth.onAuthStateChanged(user => {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('pendingScreen').style.display = 'none';
+    document.getElementById('desktop').style.display = 'none';
+    document.getElementById('taskbar').style.display = 'none';
+
+    if (!user) {
+      state.user = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+      return;
+    }
+
+    state.user = user;
+    db.collection('users').doc(user.uid).get().then(doc => {
+      if (!doc.exists) {
+        return db.collection('users').doc(user.uid).set({
+          email: user.email, status: 'pending', role: 'user',
+          permissions: { agenda: 'none', medicijnen: 'none', dialyse: 'none', bloeddruk: 'none', vocht: 'none', ritten: 'none', brieven: 'none' },
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+          document.getElementById('pendingScreen').style.display = 'flex';
+        });
+      }
+      state.userData = doc.data();
+      if (state.userData.role === 'admin' || state.userData.status === 'active') {
+        initDesktop();
+      } else {
+        document.getElementById('pendingScreen').style.display = 'flex';
+      }
+    });
+  });
+
+  function toggleRegister() {
+    state.isRegister = !state.isRegister;
+    document.getElementById('authHeading').innerText = state.isRegister ? 'Account Registreren' : 'Dialyse & Beheer OS';
+    document.getElementById('authBtn').innerText = state.isRegister ? 'Registreren' : 'Inloggen';
+    document.getElementById('authSwitchText').innerText = state.isRegister ? 'Al een account? Log hier in' : 'Nog geen account? Registreer hier';
+    document.getElementById('authErr').innerText = '';
+  }
+
+  function submitAuth() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    const errEl = document.getElementById('authErr');
+    errEl.innerText = '';
+    if (!email || !pass) { errEl.innerText = 'Vul e-mail en wachtwoord in.'; return; }
+
+    const fn = state.isRegister
+      ? auth.createUserWithEmailAndPassword(email, pass)
+      : auth.signInWithEmailAndPassword(email, pass);
+    fn.catch(e => errEl.innerText = e.message);
+  }
+
+  function logout() {
+    Object.keys(openWindows).forEach(id => closeWindow(id));
+    auth.signOut();
+  }
+
+  function hasPerm(permKey, needWrite = false) {
+    if (!state.userData) return false;
+    if (state.userData.role === 'admin') return true;
+    if (permKey === 'admin') return false;
+    const p = (state.userData.permissions || {})[permKey] || 'none';
+    return needWrite ? p === 'write' : p !== 'none';
+  }
+
+  function getLocalDateKey(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  // --- BUREAUBLAD & DATA LADEN ---
+  function initDesktop() {
+    document.getElementById('desktop').style.display = 'block';
+    document.getElementById('taskbar').style.display = 'flex';
+    document.getElementById('startUserLabel').innerText = state.user.email;
+
+    const deskIcons = document.getElementById('desktopIconsContainer');
+    const startMicro = document.getElementById('startMicroApps');
+    const startMain = document.getElementById('startMainApps');
+    deskIcons.innerHTML = '';
+    startMicro.innerHTML = '';
+    startMain.innerHTML = '';
+
+    APPS.forEach(app => {
+      if (!hasPerm(app.perm, false)) return;
+
+      const iconEl = document.createElement('div');
+      iconEl.className = 'desktop-icon';
+      iconEl.ondblclick = () => launchApp(app.id);
+      iconEl.onclick = () => { if (window.innerWidth < 768) launchApp(app.id); };
+      iconEl.innerHTML = `
+        <div class="icon-badge" style="background:${app.color};">${app.icon}</div>
+        <span>${app.short}</span>
+        ${app.type === 'micro' ? '<div class="micro-tag">stamdata</div>' : ''}
+      `;
+      deskIcons.appendChild(iconEl);
+
+      const startBtn = document.createElement('button');
+      startBtn.className = 'start-app-btn';
+      startBtn.onclick = () => { closeStartMenu(); launchApp(app.id); };
+      startBtn.innerHTML = `<span>${app.icon}</span><span>${app.short}</span>`;
+      if (app.type === 'micro') startMicro.appendChild(startBtn);
+      else startMain.appendChild(startBtn);
+    });
+
+    loadAllSharedData();
+  }
+
+  function loadAllSharedData() {
+    const uid = state.user.uid;
+
+    // 1. Ritten Stamgegevens (Kentekens, Chauffeurs, Bedrijven, Locaties)
+    db.collection('ritten_dropdowns').doc(uid).get().then(doc => {
+      if (doc.exists) {
+        state.dropdowns = { Bedrijf: [], Chauffeur: [], Kenteken: [], Vanaf: [], Naar: [], ...doc.data() };
+        refreshAllOpenWindows();
+      } else {
+        db.collection('ritten_dropdowns').doc('config').get().then(c => {
+          if (c.exists) state.dropdowns = { Bedrijf: [], Chauffeur: [], Kenteken: [], Vanaf: [], Naar: [], ...c.data() };
+          refreshAllOpenWindows();
+        });
+      }
+    });
+
+    // 2. Verpleging
+    db.collection('settings').doc('config').get().then(doc => {
+      if (doc.exists && Array.isArray(doc.data().nurses)) {
+        state.nurses = doc.data().nurses;
+        refreshAllOpenWindows();
+      }
+    });
+
+    // 3. Agenda instellingen (Artsen, Locaties, Categorieën)
+    db.collection('agenda_settings').doc(uid).get().then(doc => {
+      if (doc.exists) {
+        state.agendaSettings = { ...state.agendaSettings, ...doc.data() };
+        refreshAllOpenWindows();
+      }
+    });
+
+    // 4. Vocht instellingen (Dranken & Maten)
+    db.collection('vocht_settings').doc(uid).get().then(doc => {
+      if (doc.exists) {
+        if (doc.data().drinks?.length) state.drinks = doc.data().drinks;
+        if (doc.data().amounts?.length) state.amounts = doc.data().amounts;
+        refreshAllOpenWindows();
+      }
+    });
+
+    reloadRitten();
+    reloadDialyse();
+    reloadBp();
+    reloadVocht();
+    reloadMedicines();
+    reloadAgenda();
+    reloadBrieven();
+    if (hasPerm('admin', false)) reloadUsers();
+  }
+
+  function reloadRitten() {
+    db.collection('ritten').get().then(snap => {
+      state.ritten = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (state.userData.role === 'admin' || !data.userId || data.userId === state.user.uid) {
+          state.ritten.push({ id: d.id, ...data });
+        }
+      });
+      state.ritten.sort((a, b) => (b.afspraak || '').localeCompare(a.afspraak || ''));
+      refreshWindow('app_ritten');
+    });
+  }
+
+  function reloadDialyse() {
+    db.collection('dialyse_records').get().then(snap => {
+      state.dialyse = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (state.userData.role === 'admin' || !data.userId || data.userId === state.user.uid) {
+          state.dialyse.push({ id: data.id || d.id, ...data });
+        }
+      });
+      state.dialyse.sort((a, b) => (b.afspraakTijd || '').localeCompare(a.afspraakTijd || ''));
+      refreshWindow('app_dialyse');
+      refreshWindow('app_vocht');
+    });
+  }
+
+  function reloadBp() {
+    db.collection('bp_measurements').get().then(snap => {
+      state.bp = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (state.userData.role === 'admin' || !data.userId || data.userId === state.user.uid) {
+          state.bp.push({ id: d.id, ...data });
+        }
+      });
+      state.bp.sort((a, b) => `${b.dateStr||''} ${b.timeStr||''}`.localeCompare(`${a.dateStr||''} ${a.timeStr||''}`));
+      refreshWindow('app_bp');
+    });
+  }
+
+  function reloadVocht() {
+    db.collection('vocht_intake').get().then(snap => {
+      state.vochtAll = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (state.userData.role === 'admin' || !data.userId || data.userId === state.user.uid) {
+          let dt = data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate() : null;
+          const dateKey = (data.dateKey || (dt ? getLocalDateKey(dt) : '')).slice(0, 10);
+          const timeStr = data.time || (dt ? dt.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '00:00');
+          if (!dt && dateKey) dt = new Date(`${dateKey}T${timeStr}:00`);
+          state.vochtAll.push({
+            id: d.id,
+            drinkName: data.drinkName || 'Drank',
+            drinkImage: data.drinkImage || '',
+            amount: Number(data.amount) || 0,
+            dateKey, time: timeStr, dt
+          });
+        }
+      });
+      state.vochtAll.sort((a, b) => (b.dt ? b.dt.getTime() : 0) - (a.dt ? a.dt.getTime() : 0));
+      refreshWindow('app_vocht');
+    });
+  }
+
+  function reloadMedicines() {
+    const today = getLocalDateKey();
+    Promise.all([
+      db.collection('medicines').where('userId', '==', state.user.uid).get(),
+      db.collection('medicine_intakes').doc(`${state.user.uid}_${today}`).get()
+    ]).then(([medSnap, intakeDoc]) => {
+      state.medicines = [];
+      medSnap.forEach(d => state.medicines.push({ id: d.id, ...d.data() }));
+      state.medIntakeToday = intakeDoc.exists && intakeDoc.data().taken ? intakeDoc.data().taken : {};
+      refreshWindow('app_medicijnen');
+    });
+  }
+
+  function reloadAgenda() {
+    db.collection('agenda_events').where('userId', '==', state.user.uid).get().then(snap => {
+      state.agenda = [];
+      snap.forEach(d => state.agenda.push({ id: d.id, ...d.data() }));
+      state.agenda.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+      refreshWindow('app_agenda');
+    });
+  }
+
+  function reloadBrieven() {
+    db.collection('brieven_folders').doc(state.user.uid).get().then(doc => {
+      if (doc.exists && Array.isArray(doc.data().folders)) state.folders = doc.data().folders;
+      return db.collection('brieven_items').where('userId', '==', state.user.uid).get();
+    }).then(snap => {
+      state.brieven = [];
+      snap.forEach(d => state.brieven.push({ id: d.id, ...d.data() }));
+      state.brieven.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+      refreshWindow('app_brieven');
+    });
+  }
+
+  function reloadUsers() {
+    db.collection('users').get().then(snap => {
+      state.usersList = [];
+      snap.forEach(d => state.usersList.push({ uid: d.id, ...d.data() }));
+      refreshWindow('app_admin');
+    });
+  }
+
+  // --- VENSTERBEHEER (WINDOWS ENGINE) ---
+  function toggleStartMenu() {
+    const m = document.getElementById('startMenu');
+    m.style.display = m.style.display === 'block' ? 'none' : 'block';
+  }
+  function closeStartMenu() {
+    document.getElementById('startMenu').style.display = 'none';
+  }
+
+  function launchApp(appId) {
+    const app = APPS.find(a => a.id === appId);
+    if (!app || !hasPerm(app.perm, false)) return;
+
+    if (openWindows[appId]) {
+      const win = openWindows[appId].el;
+      win.classList.remove('minimized');
+      focusWindow(appId);
+      renderWindowContent(appId);
+      return;
+    }
+
+    const offset = Object.keys(openWindows).length * 26;
+    const desk = document.getElementById('desktop');
+    const maxW = Math.max(320, desk.clientWidth - 20);
+    const maxH = Math.max(260, desk.clientHeight - 20);
+    const width = Math.min(app.w, maxW);
+    const height = Math.min(app.h, maxH);
+    const left = Math.min(60 + offset, Math.max(8, desk.clientWidth - width - 8));
+    const top = Math.min(20 + offset, Math.max(8, desk.clientHeight - height - 8));
+
+    const win = document.createElement('div');
+    win.className = 'win-window active-win';
+    win.id = 'win_' + appId;
+    win.style.width = width + 'px';
+    win.style.height = height + 'px';
+    win.style.left = left + 'px';
+    win.style.top = top + 'px';
+    win.onmousedown = () => focusWindow(appId);
+
+    win.innerHTML = `
+      <div class="win-titlebar" ondblclick="toggleMaxWindow('${appId}')">
+        <div class="win-title-left"><span>${app.icon}</span><span>${app.title}</span></div>
+        <div class="win-controls">
+          <button class="win-ctrl-btn" onclick="event.stopPropagation(); minimizeWindow('${appId}')" title="Minimaliseren">&#8211;</button>
+          <button class="win-ctrl-btn" onclick="event.stopPropagation(); toggleMaxWindow('${appId}')" title="Maximaliseren">&#9744;</button>
+          <button class="win-ctrl-btn close" onclick="event.stopPropagation(); closeWindow('${appId}')" title="Sluiten">&times;</button>
+        </div>
+      </div>
+      <div class="win-body" id="body_${appId}"></div>
+    `;
+
+    desk.appendChild(win);
+    makeDraggable(win, win.querySelector('.win-titlebar'));
+    openWindows[appId] = { el: win, app };
+    focusWindow(appId);
+    renderWindowContent(appId);
+    renderTaskbar();
+  }
+
+  function focusWindow(appId) {
+    topZ++;
+    Object.entries(openWindows).forEach(([id, obj]) => {
+      obj.el.classList.remove('active-win');
+      if (id === appId) {
+        obj.el.style.zIndex = topZ;
+        obj.el.classList.add('active-win');
+      }
+    });
+    renderTaskbar();
+  }
+
+  function minimizeWindow(appId) {
+    if (!openWindows[appId]) return;
+    openWindows[appId].el.classList.add('minimized');
+    openWindows[appId].el.classList.remove('active-win');
+    renderTaskbar();
+  }
+
+  function minimizeAllWindows() {
+    Object.keys(openWindows).forEach(id => minimizeWindow(id));
+  }
+
+  function toggleMaxWindow(appId) {
+    if (!openWindows[appId]) return;
+    openWindows[appId].el.classList.toggle('maximized');
+    focusWindow(appId);
+  }
+
+  function closeWindow(appId) {
+    if (!openWindows[appId]) return;
+    openWindows[appId].el.remove();
+    delete openWindows[appId];
+    renderTaskbar();
+  }
+
+  function renderTaskbar() {
+    const bar = document.getElementById('taskbarWindows');
+    bar.innerHTML = '';
+    Object.entries(openWindows).forEach(([id, obj]) => {
+      const isMin = obj.el.classList.contains('minimized');
+      const isAct = obj.el.classList.contains('active-win') && !isMin;
+      const btn = document.createElement('button');
+      btn.className = 'task-item' + (isAct ? ' active' : '');
+      btn.innerText = `${obj.app.icon} ${obj.app.short}`;
+      btn.onclick = () => {
+        if (isAct) minimizeWindow(id);
+        else { obj.el.classList.remove('minimized'); focusWindow(id); }
+      };
+      bar.appendChild(btn);
+    });
+  }
+
+  function makeDraggable(winEl, handleEl) {
+    let startX = 0, startY = 0, origLeft = 0, origTop = 0;
+    handleEl.onmousedown = e => {
+      if (e.target.tagName === 'BUTTON' || winEl.classList.contains('maximized')) return;
+      e.preventDefault();
+      startX = e.clientX; startY = e.clientY;
+      origLeft = winEl.offsetLeft; origTop = winEl.offsetTop;
+      document.onmousemove = ev => {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        winEl.style.left = Math.max(0, origLeft + dx) + 'px';
+        winEl.style.top = Math.max(0, origTop + dy) + 'px';
+      };
+      document.onmouseup = () => { document.onmousemove = null; document.onmouseup = null; };
+    };
+  }
+
+  function refreshWindow(appId) {
+    if (openWindows[appId]) renderWindowContent(appId);
+  }
+  function refreshAllOpenWindows() {
+    Object.keys(openWindows).forEach(id => renderWindowContent(id));
+  }
+
+  // --- RENDER LOGICA PER MICRO-APP & SAMENVOEG-APP ---
+  function renderWindowContent(appId) {
+    const body = document.getElementById('body_' + appId);
+    if (!body) return;
+
+    // 1-3: KLEINE STAMGEGEVENS APPS (Kentekens, Chauffeurs, Bedrijven)
+    if (appId === 'app_kentekens') return renderSimpleDropdownMicroApp(body, 'Kenteken', 'Kenteken', 'bijv. 12-ABC-3', 'ritten');
+    if (appId === 'app_chauffeurs') return renderSimpleDropdownMicroApp(body, 'Chauffeur', 'Chauffeur', 'bijv. Jan de Vries', 'ritten');
+    if (appId === 'app_bedrijven') return renderSimpleDropdownMicroApp(body, 'Bedrijf', 'Bedrijf', 'bijv. Taxibedrijf Noord', 'ritten');
+
+    // 4: LOCATIES MICRO-APP (Vanaf, Naar & Agenda-locaties)
+    if (appId === 'app_locaties') {
+      const canW = hasPerm('ritten', true) || hasPerm('agenda', true);
+      const allLocs = [...new Set([...(state.dropdowns.Vanaf||[]), ...(state.dropdowns.Naar||[]), ...(state.agendaSettings.locations||[])])].sort();
+      body.innerHTML = `
+        <div class="card-box">
+          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Locaties die je hier toevoegt verschijnen direct in <b>Rittenapp.exe</b> (Vanaf/Naar) en <b>Agenda.exe</b>.</p>
+          ${canW ? `
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="microLocInput" placeholder="Nieuwe locatie of adres..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <button class="btn btn-success" onclick="addSharedLocation()">+ Toevoegen</button>
+          </div>` : ''}
+        </div>
+        <div class="chip-list">
+          ${allLocs.map(loc => `
+            <span class="data-chip">${loc} ${canW ? `<button onclick="removeSharedLocation('${loc.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
+          `).join('') || '<span style="color:#64748b;">Nog geen locaties.</span>'}
+        </div>
+      `;
+      return;
+    }
+
+    // 5: VERPLEGING MICRO-APP
+    if (appId === 'app_verpleging') {
+      const canW = hasPerm('dialyse', true);
+      body.innerHTML = `
+        <div class="card-box">
+          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Verpleegkundigen voor <b>Dialyse Beheer.exe</b>:</p>
+          ${canW ? `
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="microNurseInput" placeholder="Naam verpleegkundige..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <button class="btn btn-success" onclick="addMicroNurse()">+ Toevoegen</button>
+          </div>` : ''}
+        </div>
+        <div class="chip-list">
+          ${state.nurses.map(n => `
+            <span class="data-chip">${n} ${canW ? `<button onclick="removeMicroNurse('${n.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
+          `).join('')}
+        </div>
+      `;
+      return;
+    }
+
+    // 6: ARTSEN MICRO-APP
+    if (appId === 'app_artsen') {
+      const canW = hasPerm('agenda', true);
+      body.innerHTML = `
+        <div class="card-box">
+          <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">Artsen & specialisten voor <b>Agenda.exe</b>:</p>
+          ${canW ? `
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="microDocInput" placeholder="Naam arts / nefroloog..." style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <button class="btn btn-success" onclick="addMicroDoctor()">+ Toevoegen</button>
+          </div>` : ''}
+        </div>
+        <div class="chip-list">
+          ${(state.agendaSettings.doctors || []).map(d => `
+            <span class="data-chip">${d} ${canW ? `<button onclick="removeMicroDoctor('${d.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
+          `).join('') || '<span style="color:#64748b;">Nog geen artsen toegevoegd.</span>'}
+        </div>
+      `;
+      return;
+    }
+
+    // 7: DRANKEN & MATEN MICRO-APP
+    if (appId === 'app_dranken') {
+      const canW = hasPerm('vocht', true);
+      body.innerHTML = `
+        <div class="card-box">
+          <strong>Vaste Hoeveelheden (ml) voor POS Vocht Monitor.exe</strong>
+          ${canW ? `
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input type="number" id="microAmtInput" placeholder="bijv. 250" style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+            <button class="btn btn-success" onclick="addMicroAmount()">+ Maat</button>
+          </div>` : ''}
+          <div class="chip-list">
+            ${state.amounts.slice().sort((a,b)=>a-b).map(a => `
+              <span class="data-chip">${a} ml ${canW ? `<button onclick="removeMicroAmount(${a})">&times;</button>` : ''}</span>
+            `).join('')}
+          </div>
+        </div>
+        <div class="card-box">
+          <strong>Dranktegels voor POS Vocht Monitor.exe</strong>
+          ${canW ? `
+          <div class="grid-2" style="margin-top:8px;">
+            <input type="text" id="microDrinkName" placeholder="Naam drankje (bijv. Thee)">
+            <input type="text" id="microDrinkImg" placeholder="Afbeelding URL (optioneel)">
+          </div>
+          <button class="btn btn-success btn-sm" onclick="addMicroDrink()">+ Dranktegel Opslaan</button>` : ''}
+          <table>
+            <thead><tr><th>Foto</th><th>Naam</th><th>Actie</th></tr></thead>
+            <tbody>
+              ${state.drinks.map((dr, idx) => `
+                <tr>
+                  <td><img src="${dr.image}" style="width:36px; height:36px; object-fit:cover; border-radius:4px;" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80'"></td>
+                  <td><b>${dr.name}</b></td>
+                  <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="removeMicroDrink(${idx})">Verwijder</button>` : '-'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      return;
+    }
+
+    // 8: RITTENAPP (VOEGT BEDRIJF, CHAUFFEUR, KENTEKEN, LOCATIE SAMEN)
+    if (appId === 'app_ritten') {
+      const canW = hasPerm('ritten', true);
+      const bedrijven = (state.dropdowns.Bedrijf || []).slice().sort();
+      const chauffeurs = (state.dropdowns.Chauffeur || []).slice().sort();
+      const kentekens = (state.dropdowns.Kenteken || []).slice().sort();
+      const vanafs = (state.dropdowns.Vanaf || []).slice().sort();
+      const naars = (state.dropdowns.Naar || []).slice().sort();
+
+      body.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary" onclick="launchApp('app_kentekens')">+ Kentekens.exe</button>
+            <button class="btn btn-sm btn-secondary" onclick="launchApp('app_chauffeurs')">+ Chauffeurs.exe</button>
+            <button class="btn btn-sm btn-secondary" onclick="launchApp('app_bedrijven')">+ Bedrijven.exe</button>
+            <button class="btn btn-sm btn-secondary" onclick="launchApp('app_locaties')">+ Locaties.exe</button>
+          </div>
+          <button class="btn btn-sm btn-success" onclick="exportRittenExcel()">Excel Export</button>
+        </div>
+
+        ${canW ? `
+        <form class="card-box" onsubmit="saveRitFromApp(event)">
+          <div class="grid-2">
+            <div class="field"><label>Bedrijf (uit Bedrijven.exe)</label>
+              <select id="rit_bedrijf" required><option value="">-- Kies --</option>${bedrijven.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Chauffeur (uit Chauffeurs.exe)</label>
+              <select id="rit_chauffeur" required><option value="">-- Kies --</option>${chauffeurs.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Kenteken (uit Kentekens.exe)</label>
+              <select id="rit_kenteken" required><option value="">-- Kies --</option>${kentekens.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Vanaf (uit Locaties.exe)</label>
+              <select id="rit_vanaf" required><option value="">-- Kies --</option>${vanafs.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Naar (uit Locaties.exe)</label>
+              <select id="rit_naar" required><option value="">-- Kies --</option>${naars.map(x=>`<option value="${x}">${x}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Afspraak Tijd</label><input type="datetime-local" id="rit_afspraak" required></div>
+            <div class="field"><label>Start Tijd</label><input type="datetime-local" id="rit_start"></div>
+            <div class="field"><label>Stop Tijd</label><input type="datetime-local" id="rit_stop"></div>
+          </div>
+          <div class="field" style="margin-bottom:8px;"><label>Opmerkingen</label><input type="text" id="rit_opm" placeholder="Bijzonderheden..."></div>
+          <button type="submit" class="btn">Rit Opslaan</button>
+        </form>` : ''}
+
+        <table>
+          <thead><tr><th>Bedrijf</th><th>Chauffeur</th><th>Kenteken</th><th>Route</th><th>Afspraak</th><th>Start</th><th>Stop</th><th>Actie</th></tr></thead>
+          <tbody>
+            ${state.ritten.map(r => `
+              <tr>
+                <td>${r.bedrijf||'-'}</td>
+                <td>${r.chauffeur||'-'}</td>
+                <td><b>${r.kenteken||'-'}</b></td>
+                <td>${r.vanaf||'-'} &rarr; ${r.naar||'-'}</td>
+                <td>${(r.afspraak||'').replace('T',' ')}</td>
+                <td>${(r.start||'').replace('T',' ')||'-'}</td>
+                <td>${(r.stop||'').replace('T',' ')||'-'}</td>
+                <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="deleteRitItem('${r.id}')">X</button>` : '-'}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="8" style="text-align:center;">Geen ritten gevonden.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 9: DIALYSE BEHEER (VOEGT VERPLEGING SAMEN + UF KLEURCODERING)
+    if (appId === 'app_dialyse') {
+      const canW = hasPerm('dialyse', true);
+      const dryW = getLatestDryWeight();
+      body.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <div><strong>Actueel Drooggewicht: ${dryW.toFixed(1)} kg</strong></div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-sm btn-secondary" onclick="launchApp('app_verpleging')">+ Verpleging.exe</button>
+            <button class="btn btn-sm btn-success" onclick="exportDialyseExcel()">Excel Export</button>
+          </div>
+        </div>
+
+        ${canW ? `
+        <form class="card-box" onsubmit="saveDialyseSession(event)">
+          <div class="grid-2">
+            <div class="field"><label>Soort Dialyse</label>
+              <select id="dia_soort" onchange="calcDialyseLive()">
+                <option value="Nacht">Nacht (+7u | corr. 0.3)</option>
+                <option value="Dag">Dag (+4u | corr. 0.6)</option>
+              </select>
+            </div>
+            <div class="field"><label>Afspraak Tijd</label><input type="datetime-local" id="dia_afspraak" required onchange="calcDialyseLive()"></div>
+            <div class="field"><label>Pre Gewicht (kg)</label><input type="number" step="0.1" id="dia_pre" required oninput="calcDialyseLive()"></div>
+            <div class="field"><label>Post Gewicht (kg)</label><input type="number" step="0.1" id="dia_post" oninput="calcDialyseLive()"></div>
+            <div class="field"><label>UF Advies (L)</label><input type="text" id="dia_uf_adv" class="readonly" readonly></div>
+            <div class="field"><label>UF Ingesteld (L)</label><input type="number" step="0.1" id="dia_uf_set"></div>
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label>Verpleging (uit Verpleging.exe)</label>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; padding:6px; background:#fff; border:1px solid #cbd5e1; border-radius:5px;">
+              ${state.nurses.map(n => `<label style="display:flex; align-items:center; gap:4px; font-weight:normal;"><input type="checkbox" class="dia_nurse_chk" value="${n}"> ${n}</label>`).join('')}
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:8px;"><label>Verslag</label><input type="text" id="dia_verslag" placeholder="Bijzonderheden..."></div>
+          <button type="submit" class="btn">Sessie Opslaan</button>
+        </form>` : ''}
+
+        <table>
+          <thead><tr><th>ID</th><th>Afspraak</th><th>Soort</th><th>Pre</th><th>Post</th><th>UF Advies</th><th>Verpleging</th></tr></thead>
+          <tbody>
+            ${state.dialyse.map(r => {
+              const num = parseFloat(r.ufAdvies);
+              let cls = 'bg-green';
+              if (!isNaN(num)) { if (num >= 4.5) cls = 'bg-red'; else if (num >= 4.0) cls = 'bg-orange'; }
+              return `<tr>
+                <td>${r.id}</td>
+                <td>${(r.afspraakTijd||'').replace('T',' ')}</td>
+                <td>${r.soortDialyse||'-'}</td>
+                <td>${r.preGewicht||'-'} kg</td>
+                <td>${r.postGewicht||'-'} kg</td>
+                <td><span class="badge ${cls}">${r.ufAdvies||'-'}</span></td>
+                <td>${r.verpleging||'-'}</td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="7" style="text-align:center;">Geen sessies gevonden.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 10: POS VOCHT MONITOR (VOEGT DRANKEN & MATEN SAMEN)
+    if (appId === 'app_vocht') {
+      const canW = hasPerm('vocht', true);
+      const todayKey = getLocalDateKey();
+      const todayList = state.vochtAll.filter(x => x.dateKey === todayKey);
+      const resetDt = getDialyseResetDate();
+      const cycleList = state.vochtAll.filter(x => x.dt && x.dt >= resetDt);
+
+      const dayMl = todayList.reduce((s, x) => s + x.amount, 0);
+      const cycMl = cycleList.reduce((s, x) => s + x.amount, 0);
+      const dayPct = Math.min(100, Math.round((dayMl / 1000) * 100));
+      const cycPct = Math.min(100, Math.round((cycMl / 2000) * 100));
+      const dayCol = dayMl > 1000 ? '#dc2626' : (dayMl >= 800 ? '#f59e0b' : '#16a34a');
+      const cycCol = cycMl > 2000 ? '#dc2626' : (cycMl >= 1600 ? '#f59e0b' : '#16a34a');
+
+      body.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+          <span style="font-size:0.8rem; color:#475569;">Cyclus sinds dialysedag ${resetDt.toLocaleDateString('nl-NL')} 22:30</span>
+          <button class="btn btn-sm btn-secondary" onclick="launchApp('app_dranken')">+ Dranken & Maten.exe</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="bar-wrap">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:0.82rem;">
+              <span>Vandaag: ${dayMl} / 1000 ml</span><span>${Math.round((dayMl/1000)*100)}%</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill" style="width:${dayPct}%; background:${dayCol};"></div></div>
+          </div>
+          <div class="bar-wrap">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:0.82rem;">
+              <span>Tussen dialyses: ${cycMl} / 2000 ml</span><span>${Math.round((cycMl/2000)*100)}%</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill" style="width:${cycPct}%; background:${cycCol};"></div></div>
+          </div>
+        </div>
+
+        <div class="pos-tiles" style="margin-bottom:14px;">
+          ${state.drinks.map((dr, idx) => `
+            <div class="pos-btn" onclick="openVochtPopup(${idx})">
+              <img src="${dr.image}" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80'">
+              <span>${dr.name}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <table>
+          <thead><tr><th>Datum</th><th>Tijd</th><th>Drank</th><th>Hoeveelheid</th><th>Actie</th></tr></thead>
+          <tbody>
+            ${cycleList.map(i => `
+              <tr>
+                <td>${i.dateKey}</td><td>${i.time}</td><td><b>${i.drinkName}</b></td><td>${i.amount} ml</td>
+                <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="deleteVochtItem('${i.id}')">X</button>` : '-'}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="5" style="text-align:center;">Nog geen inname in deze cyclus.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 11: BLOEDDRUK & HARTSLAG
+    if (appId === 'app_bp') {
+      const canW = hasPerm('bloeddruk', true);
+      body.innerHTML = `
+        ${canW ? `
+        <form class="card-box" onsubmit="saveBpItem(event)">
+          <div class="grid-2">
+            <div class="field"><label>Bovendruk (Sys)</label><input type="number" id="bp_sys" required placeholder="120"></div>
+            <div class="field"><label>Onderdruk (Dia)</label><input type="number" id="bp_dia" required placeholder="80"></div>
+            <div class="field"><label>Hartslag (bpm)</label><input type="number" id="bp_hr" required placeholder="70"></div>
+            <div class="field"><label>Opmerking</label><input type="text" id="bp_note" placeholder="Voor dialyse..."></div>
+          </div>
+          <button type="submit" class="btn">Meting Opslaan</button>
+        </form>` : ''}
+        <table>
+          <thead><tr><th>Datum/Tijd</th><th>Bloeddruk</th><th>Hartslag</th><th>Status</th><th>Opmerking</th><th>Actie</th></tr></thead>
+          <tbody>
+            ${state.bp.map(m => {
+              let badge = '<span class="badge bg-green">Stabiel</span>';
+              if (m.sys < 90 || m.dia < 60 || m.hr < 50 || m.sys >= 180 || m.dia >= 110 || m.hr > 110) badge = '<span class="badge bg-red">Let op!</span>';
+              else if (m.sys >= 140 || m.dia >= 90 || m.hr > 100) badge = '<span class="badge bg-orange">Verhoogd</span>';
+              return `<tr>
+                <td>${m.dateStr||''} ${m.timeStr||''}</td>
+                <td><b>${m.sys}/${m.dia}</b> mmHg</td>
+                <td><b>${m.hr}</b> bpm</td>
+                <td>${badge}</td>
+                <td>${m.note||'-'}</td>
+                <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="deleteBp('${m.id}')">X</button>` : '-'}</td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="6" style="text-align:center;">Geen metingen.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 12: MEDICIJNEN
+    if (appId === 'app_medicijnen') {
+      const canW = hasPerm('medicijnen', true);
+      const blocks = [
+        { k: 'morning', label: 'Ochtend' },
+        { k: 'afternoon', label: 'Middag' },
+        { k: 'evening', label: 'Avond' },
+        { k: 'post_dialysis', label: 'Na dialyse' }
+      ];
+      body.innerHTML = `
+        <div class="grid-2">
+          ${blocks.map(b => {
+            const list = state.medicines.filter(m => Array.isArray(m.blocks) && m.blocks.includes(b.k));
+            return `<div class="card-box">
+              <strong>${b.label}</strong>
+              <div style="margin-top:6px; display:flex; flex-direction:column; gap:5px;">
+                ${list.map(m => {
+                  const key = `${m.id}_${b.k}`;
+                  const taken = Boolean(state.medIntakeToday[key]?.taken);
+                  return `<label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; ${taken?'text-decoration:line-through; color:#16a34a;':''}">
+                    <input type="checkbox" ${taken?'checked':''} ${canW?'':'disabled'} onchange="toggleMedCheck('${m.id}','${b.k}',this.checked)">
+                    <span><b>${m.name}</b> (${m.dosage||''})</span>
+                  </label>`;
+                }).join('') || '<span style="font-size:0.78rem; color:#64748b;">Geen medicijnen</span>'}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${canW ? `
+        <form class="card-box" onsubmit="addMedicineItem(event)">
+          <div class="grid-2">
+            <div class="field"><label>Medicijn</label><input type="text" id="med_name" required placeholder="Renvela"></div>
+            <div class="field"><label>Dosering</label><input type="text" id="med_dose" required placeholder="800 mg"></div>
+            <div class="field"><label>Tijdstip</label><input type="time" id="med_time" value="08:00"></div>
+          </div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+            <label><input type="checkbox" id="mb_m" checked> Ochtend</label>
+            <label><input type="checkbox" id="mb_a"> Middag</label>
+            <label><input type="checkbox" id="mb_e"> Avond</label>
+            <label><input type="checkbox" id="mb_p"> Na dialyse</label>
+          </div>
+          <button type="submit" class="btn btn-success">Medicijn Toevoegen</button>
+        </form>` : ''}
+      `;
+      return;
+    }
+
+    // 13: AGENDA (VOEGT ARTSEN & LOCATIES SAMEN)
+    if (appId === 'app_agenda') {
+      const canW = hasPerm('agenda', true);
+      const docs = (state.agendaSettings.doctors || []).slice().sort();
+      const locs = [...new Set([...(state.agendaSettings.locations || []), ...(state.dropdowns.Vanaf || []), ...(state.dropdowns.Naar || [])])].sort();
+      body.innerHTML = `
+        <div style="display:flex; gap:6px; margin-bottom:10px;">
+          <button class="btn btn-sm btn-secondary" onclick="launchApp('app_artsen')">+ Artsen.exe</button>
+          <button class="btn btn-sm btn-secondary" onclick="launchApp('app_locaties')">+ Locaties.exe</button>
+        </div>
+        ${canW ? `
+        <form class="card-box" onsubmit="saveAgendaItem(event)">
+          <div class="grid-2">
+            <div class="field"><label>Titel</label><input type="text" id="ag_title" required placeholder="Controle Nefroloog"></div>
+            <div class="field"><label>Start</label><input type="datetime-local" id="ag_start" required></div>
+            <div class="field"><label>Arts (uit Artsen.exe)</label>
+              <select id="ag_doc"><option value="">-- Geen --</option>${docs.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Locatie (uit Locaties.exe)</label>
+              <select id="ag_loc"><option value="">-- Geen --</option>${locs.map(l=>`<option value="${l}">${l}</option>`).join('')}</select>
+            </div>
+          </div>
+          <button type="submit" class="btn">Afspraak Opslaan</button>
+        </form>` : ''}
+        <table>
+          <thead><tr><th>Start</th><th>Titel</th><th>Arts</th><th>Locatie</th><th>Actie</th></tr></thead>
+          <tbody>
+            ${state.agenda.map(e => `
+              <tr>
+                <td>${(e.start||'').replace('T',' ')}</td>
+                <td><b>${e.title||'-'}</b></td>
+                <td>${e.doctor||'-'}</td>
+                <td>${e.location||'-'}</td>
+                <td>${canW ? `<button class="btn btn-danger btn-sm" onclick="deleteAgendaItem('${e.id}')">X</button>` : '-'}</td>
+              </tr>
+            `).join('') || '<tr><td colspan="5" style="text-align:center;">Geen afspraken.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 14: BRIEVEN & MAPPEN
+    if (appId === 'app_brieven') {
+      const canW = hasPerm('brieven', true);
+      body.innerHTML = `
+        ${canW ? `
+        <form class="card-box" onsubmit="saveBriefItem(event)">
+          <div class="grid-2">
+            <div class="field"><label>Titel Brief</label><input type="text" id="br_title" required placeholder="Brief Ziekenhuis"></div>
+            <div class="field"><label>Map</label>
+              <select id="br_folder">${state.folders.map(f=>`<option value="${f}">${f}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Bestand / Camera Scan</label><input type="file" id="br_file" accept="image/*,application/pdf" required onchange="pickBriefFile(this)"></div>
+          </div>
+          <button type="submit" class="btn btn-success">Brief Opslaan</button>
+        </form>` : ''}
+        <table>
+          <thead><tr><th>Datum</th><th>Titel</th><th>Map</th><th>Acties</th></tr></thead>
+          <tbody>
+            ${state.brieven.map(b => `
+              <tr>
+                <td>${b.dateKey||'-'}</td>
+                <td><b>${b.title||'-'}</b></td>
+                <td>${b.folder||'Algemeen'}</td>
+                <td>
+                  <a href="${b.dataUrl}" download="${b.fileName||'brief'}" class="btn btn-sm">Download</a>
+                  ${canW ? `<button class="btn btn-danger btn-sm" onclick="deleteBrief('${b.id}')">X</button>` : ''}
+                </td>
+              </tr>
+            `).join('') || '<tr><td colspan="4" style="text-align:center;">Geen brieven opgeslagen.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+      return;
+    }
+
+    // 15: ADMIN GEBRUIKERSBEHEER
+    if (appId === 'app_admin') {
+      body.innerHTML = `
+        <table>
+          <thead><tr><th>E-mail</th><th>Status</th><th>Ritten</th><th>Dialyse</th><th>Vocht</th><th>Bloeddruk</th><th>Medicijnen</th><th>Agenda</th><th>Brieven</th><th>Actie</th></tr></thead>
+          <tbody>
+            ${state.usersList.map(u => {
+              const p = u.permissions || {};
+              const sel = (k) => `<select onchange="setUserPerm('${u.uid}','${k}',this.value)">
+                <option value="none" ${(p[k]||'none')==='none'?'selected':''}>Geen</option>
+                <option value="read" ${p[k]==='read'?'selected':''}>Lezen</option>
+                <option value="write" ${p[k]==='write'?'selected':''}>Schrijven</option>
+              </select>`;
+              return `<tr>
+                <td>${u.email}</td>
+                <td>${u.status==='active' ? '<span class="badge bg-green">Actief</span>' : '<span class="badge bg-orange">Standby</span>'}</td>
+                <td>${sel('ritten')}</td><td>${sel('dialyse')}</td><td>${sel('vocht')}</td>
+                <td>${sel('bloeddruk')}</td><td>${sel('medicijnen')}</td><td>${sel('agenda')}</td><td>${sel('brieven')}</td>
+                <td>${u.status!=='active' ? `<button class="btn btn-success btn-sm" onclick="approveUserAccount('${u.uid}')">Goedkeuren</button>` : '-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  }
+
+  // --- HELPER VOOR KLEINE DROPDOWN MICRO-APPS (KENTEKENS, CHAUFFEURS, BEDRIJVEN) ---
+  function renderSimpleDropdownMicroApp(body, categoryKey, label, placeholder, permKey) {
+    const canW = hasPerm(permKey, true);
+    const items = (state.dropdowns[categoryKey] || []).slice().sort();
+    body.innerHTML = `
+      <div class="card-box">
+        <p style="font-size:0.8rem; color:#475569; margin-bottom:8px;">
+          Beheer hier alle <b>${label.toLowerCase()}s</b>. Zodra je er één toevoegt, staat hij direct klaar in <b>Rittenapp.exe</b>.
+        </p>
+        ${canW ? `
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="microInp_${categoryKey}" placeholder="${placeholder}" style="flex:1; padding:7px; border:1px solid #cbd5e1; border-radius:5px;">
+          <button class="btn btn-success" onclick="addDropdownMicroItem('${categoryKey}')">+ Toevoegen</button>
+        </div>` : ''}
+      </div>
+      <div class="chip-list">
+        ${items.map(val => `
+          <span class="data-chip">${val} ${canW ? `<button onclick="removeDropdownMicroItem('${categoryKey}', '${val.replace(/'/g,"\\'")}')">&times;</button>` : ''}</span>
+        `).join('') || `<span style="color:#64748b;">Nog geen ${label.toLowerCase()}s ingevuld.</span>`}
+      </div>
+    `;
+  }
+
+  function addDropdownMicroItem(cat) {
+    const inp = document.getElementById('microInp_' + cat);
+    const val = inp.value.trim();
+    if (!val) return;
+    if (!Array.isArray(state.dropdowns[cat])) state.dropdowns[cat] = [];
+    if (!state.dropdowns[cat].includes(val)) {
+      state.dropdowns[cat].push(val);
+      db.collection('ritten_dropdowns').doc(state.user.uid).set(state.dropdowns, { merge: true }).then(() => {
+        refreshAllOpenWindows();
+      });
+    }
+  }
+
+  function removeDropdownMicroItem(cat, val) {
+    state.dropdowns[cat] = (state.dropdowns[cat] || []).filter(x => x !== val);
+    db.collection('ritten_dropdowns').doc(state.user.uid).set(state.dropdowns, { merge: true }).then(() => {
+      refreshAllOpenWindows();
+    });
+  }
+
+  function addSharedLocation() {
+    const inp = document.getElementById('microLocInput');
+    const val = inp.value.trim();
+    if (!val) return;
+    if (!state.dropdowns.Vanaf.includes(val)) state.dropdowns.Vanaf.push(val);
+    if (!state.dropdowns.Naar.includes(val)) state.dropdowns.Naar.push(val);
+    if (!state.agendaSettings.locations.includes(val)) state.agendaSettings.locations.push(val);
+    Promise.all([
+      db.collection('ritten_dropdowns').doc(state.user.uid).set(state.dropdowns, { merge: true }),
+      db.collection('agenda_settings').doc(state.user.uid).set(state.agendaSettings, { merge: true })
+    ]).then(() => refreshAllOpenWindows());
+  }
+
+  function removeSharedLocation(val) {
+    state.dropdowns.Vanaf = (state.dropdowns.Vanaf || []).filter(x => x !== val);
+    state.dropdowns.Naar = (state.dropdowns.Naar || []).filter(x => x !== val);
+    state.agendaSettings.locations = (state.agendaSettings.locations || []).filter(x => x !== val);
+    Promise.all([
+      db.collection('ritten_dropdowns').doc(state.user.uid).set(state.dropdowns, { merge: true }),
+      db.collection('agenda_settings').doc(state.user.uid).set(state.agendaSettings, { merge: true })
+    ]).then(() => refreshAllOpenWindows());
+  }
+
+  function addMicroNurse() {
+    const val = document.getElementById('microNurseInput').value.trim();
+    if (!val || state.nurses.includes(val)) return;
+    state.nurses.push(val);
+    db.collection('settings').doc('config').set({ nurses: state.nurses }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+  function removeMicroNurse(val) {
+    state.nurses = state.nurses.filter(x => x !== val);
+    db.collection('settings').doc('config').set({ nurses: state.nurses }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+
+  function addMicroDoctor() {
+    const val = document.getElementById('microDocInput').value.trim();
+    if (!val) return;
+    if (!state.agendaSettings.doctors) state.agendaSettings.doctors = [];
+    if (!state.agendaSettings.doctors.includes(val)) {
+      state.agendaSettings.doctors.push(val);
+      db.collection('agenda_settings').doc(state.user.uid).set(state.agendaSettings, { merge: true }).then(() => refreshAllOpenWindows());
+    }
+  }
+  function removeMicroDoctor(val) {
+    state.agendaSettings.doctors = (state.agendaSettings.doctors || []).filter(x => x !== val);
+    db.collection('agenda_settings').doc(state.user.uid).set(state.agendaSettings, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+
+  function addMicroAmount() {
+    const val = parseInt(document.getElementById('microAmtInput').value, 10);
+    if (isNaN(val) || val <= 0 || state.amounts.includes(val)) return;
+    state.amounts.push(val);
+    db.collection('vocht_settings').doc(state.user.uid).set({ drinks: state.drinks, amounts: state.amounts }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+  function removeMicroAmount(val) {
+    if (state.amounts.length <= 1) return;
+    state.amounts = state.amounts.filter(x => x !== val);
+    db.collection('vocht_settings').doc(state.user.uid).set({ drinks: state.drinks, amounts: state.amounts }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+  function addMicroDrink() {
+    const name = document.getElementById('microDrinkName').value.trim();
+    const image = document.getElementById('microDrinkImg').value.trim() || 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=300&q=80';
+    if (!name) return;
+    state.drinks.push({ name, image });
+    db.collection('vocht_settings').doc(state.user.uid).set({ drinks: state.drinks, amounts: state.amounts }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+  function removeMicroDrink(idx) {
+    state.drinks.splice(idx, 1);
+    db.collection('vocht_settings').doc(state.user.uid).set({ drinks: state.drinks, amounts: state.amounts }, { merge: true }).then(() => refreshAllOpenWindows());
+  }
+
+  // --- ACTIES VAN DE HOOFDPROGRAMMA'S ---
+  function saveRitFromApp(e) {
+    e.preventDefault();
+    db.collection('ritten').add({
+      userId: state.user.uid,
+      bedrijf: document.getElementById('rit_bedrijf').value,
+      chauffeur: document.getElementById('rit_chauffeur').value,
+      kenteken: document.getElementById('rit_kenteken').value,
+      vanaf: document.getElementById('rit_vanaf').value,
+      naar: document.getElementById('rit_naar').value,
+      afspraak: document.getElementById('rit_afspraak').value,
+      start: document.getElementById('rit_start').value,
+      stop: document.getElementById('rit_stop').value,
+      opmerkingen: document.getElementById('rit_opm').value,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => reloadRitten());
+  }
+  function deleteRitItem(id) {
+    if (confirm('Rit verwijderen?')) db.collection('ritten').doc(id).delete().then(() => reloadRitten());
+  }
+  function exportRittenExcel() {
+    const ws = XLSX.utils.json_to_sheet(state.ritten);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ritten');
+    XLSX.writeFile(wb, 'Ritten_Overzicht.xlsx');
+  }
+
+  function getLatestDryWeight() {
+    let dry = 118.0;
+    [...state.dialyse].reverse().forEach(r => {
+      const post = parseFloat(r.postGewicht);
+      if (!isNaN(post) && post > 0 && post < dry) dry = post;
+    });
+    return dry;
+  }
+  function calcDialyseLive() {
+    const pre = parseFloat(document.getElementById('dia_pre')?.value);
+    const soort = document.getElementById('dia_soort')?.value || 'Nacht';
+    const ufField = document.getElementById('dia_uf_adv');
+    if (!ufField) return;
+    if (isNaN(pre)) { ufField.value = ''; ufField.className = 'readonly'; return; }
+    const dry = getLatestDryWeight();
+    const corr = soort === 'Nacht' ? 0.3 : 0.6;
+    const adv = pre - dry + corr;
+    ufField.value = adv.toFixed(2) + ' kg';
+    ufField.className = 'readonly ' + (adv >= 4.5 ? 'uf-red' : (adv >= 4.0 ? 'uf-orange' : 'uf-green'));
+  }
+  function saveDialyseSession(e) {
+    e.preventDefault();
+    const afsp = document.getElementById('dia_afspraak').value;
+    const d = new Date(afsp);
+    const id = `${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${d.getFullYear()}${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+    const nurses = Array.from(document.querySelectorAll('.dia_nurse_chk:checked')).map(c => c.value).join(', ');
+    db.collection('dialyse_records').doc(id).set({
+      userId: state.user.uid, id,
+      soortDialyse: document.getElementById('dia_soort').value,
+      afspraakTijd: afsp,
+      preGewicht: parseFloat(document.getElementById('dia_pre').value) || 0,
+      postGewicht: parseFloat(document.getElementById('dia_post').value) || 0,
+      ufAdvies: document.getElementById('dia_uf_adv').value,
+      ufIngesteld: document.getElementById('dia_uf_set').value,
+      verpleging: nurses,
+      verslag: document.getElementById('dia_verslag').value,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => reloadDialyse());
+  }
+  function exportDialyseExcel() {
+    const ws = XLSX.utils.json_to_sheet(state.dialyse);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Dialyse');
+    XLSX.writeFile(wb, 'Dialyse_Overzicht.xlsx');
+  }
+
+  function getDialyseResetDate() {
+    const now = new Date();
+    const list = [];
+    state.dialyse.forEach(r => {
+      const ds = String(r.afspraakTijd || '').slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+        const [y, m, d] = ds.split('-').map(Number);
+        const dt = new Date(y, m - 1, d, 22, 30, 0);
+        if (dt <= now) list.push(dt);
+      }
+    });
+    if (list.length) { list.sort((a, b) => b - a); return list[0]; }
+    const fb = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 22, 30, 0);
+    if (fb > now) fb.setDate(fb.getDate() - 1);
+    return fb;
+  }
+
+  function openVochtPopup(idx) {
+    if (!hasPerm('vocht', true)) return;
+    state.selectedDrink = state.drinks[idx];
+    document.getElementById('popupDrinkName').innerText = state.selectedDrink.name;
+    const grid = document.getElementById('popupAmountsGrid');
+    grid.innerHTML = state.amounts.slice().sort((a,b)=>a-b).map(a =>
+      `<button class="btn" onclick="saveVochtAmount(${a})">${a} ml</button>`
+    ).join('');
+    document.getElementById('popupCustomMl').value = '';
+    document.getElementById('vochtPopup').style.display = 'flex';
+  }
+  function closeVochtPopup() {
+    document.getElementById('vochtPopup').style.display = 'none';
+  }
+  function submitCustomVocht() {
+    const v = parseInt(document.getElementById('popupCustomMl').value, 10);
+    if (!isNaN(v) && v > 0) saveVochtAmount(v);
+  }
+  function saveVochtAmount(ml) {
+    const now = new Date();
+    db.collection('vocht_intake').add({
+      userId: state.user.uid,
+      drinkName: state.selectedDrink.name,
+      drinkImage: state.selectedDrink.image,
+      amount: ml,
+      time: now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
+      dateKey: getLocalDateKey(now),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => { closeVochtPopup(); reloadVocht(); });
+  }
+  function deleteVochtItem(id) {
+    if (confirm('Verwijderen?')) db.collection('vocht_intake').doc(id).delete().then(() => reloadVocht());
+  }
+
+  function saveBpItem(e) {
+    e.preventDefault();
+    const now = new Date();
+    db.collection('bp_measurements').add({
+      userId: state.user.uid,
+      sys: parseInt(document.getElementById('bp_sys').value, 10),
+      dia: parseInt(document.getElementById('bp_dia').value, 10),
+      hr: parseInt(document.getElementById('bp_hr').value, 10),
+      note: document.getElementById('bp_note').value,
+      dateStr: getLocalDateKey(now),
+      timeStr: now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => reloadBp());
+  }
+  function deleteBp(id) {
+    if (confirm('Meting verwijderen?')) db.collection('bp_measurements').doc(id).delete().then(() => reloadBp());
+  }
+
+  function toggleMedCheck(medId, block, checked) {
+    const today = getLocalDateKey();
+    const key = `${medId}_${block}`;
+    if (checked) state.medIntakeToday[key] = { taken: true, takenAt: new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) };
+    else delete state.medIntakeToday[key];
+    db.collection('medicine_intakes').doc(`${state.user.uid}_${today}`).set({
+      userId: state.user.uid, dateKey: today, taken: state.medIntakeToday
+    }, { merge: true }).then(() => refreshWindow('app_medicijnen'));
+  }
+  function addMedicineItem(e) {
+    e.preventDefault();
+    const blocks = [];
+    if (document.getElementById('mb_m').checked) blocks.push('morning');
+    if (document.getElementById('mb_a').checked) blocks.push('afternoon');
+    if (document.getElementById('mb_e').checked) blocks.push('evening');
+    if (document.getElementById('mb_p').checked) blocks.push('post_dialysis');
+    if (!blocks.length) return;
+    db.collection('medicines').add({
+      userId: state.user.uid,
+      name: document.getElementById('med_name').value,
+      dosage: document.getElementById('med_dose').value,
+      dailyTime: document.getElementById('med_time').value,
+      blocks
+    }).then(() => reloadMedicines());
+  }
+
+  function saveAgendaItem(e) {
+    e.preventDefault();
+    db.collection('agenda_events').add({
+      userId: state.user.uid,
+      title: document.getElementById('ag_title').value,
+      start: document.getElementById('ag_start').value,
+      doctor: document.getElementById('ag_doc').value,
+      location: document.getElementById('ag_loc').value,
+      category: 'Overig',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => reloadAgenda());
+  }
+  function deleteAgendaItem(id) {
+    if (confirm('Afspraak verwijderen?')) db.collection('agenda_events').doc(id).delete().then(() => reloadAgenda());
+  }
+
+  function pickBriefFile(inp) {
+    const f = inp.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => { state.draftLetter = { dataUrl: ev.target.result, mimeType: f.type, fileName: f.name }; };
+    reader.readAsDataURL(f);
+  }
+  function saveBriefItem(e) {
+    e.preventDefault();
+    if (!state.draftLetter) return;
+    const now = new Date();
+    db.collection('brieven_items').add({
+      userId: state.user.uid,
+      title: document.getElementById('br_title').value,
+      folder: document.getElementById('br_folder').value,
+      fileName: state.draftLetter.fileName,
+      mimeType: state.draftLetter.mimeType,
+      dataUrl: state.draftLetter.dataUrl,
+      dateKey: getLocalDateKey(now),
+      createdAtMs: now.getTime()
+    }).then(() => { state.draftLetter = null; reloadBrieven(); });
+  }
+  function deleteBrief(id) {
+    if (confirm('Brief verwijderen?')) db.collection('brieven_items').doc(id).delete().then(() => reloadBrieven());
+  }
+
+  function approveUserAccount(uid) {
+    db.collection('users').doc(uid).update({ status: 'active' }).then(() => reloadUsers());
+  }
+  function setUserPerm(uid, mod, val) {
+    db.collection('users').doc(uid).update({ [`permissions.${mod}`]: val });
+  }
+</script>
+</body>
+</html>
