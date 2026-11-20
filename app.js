@@ -21,7 +21,6 @@ import {
   Timestamp
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Configuratie voor Cloudsysteem Wagt 2026
 const firebaseConfig = {
   apiKey: "AIzaSyAO-0eNDaOxWhW9WfaZ2kaDyFyFQQdeRYo",
   authDomain: "cloudsysteem-wagt-2026.firebaseapp.com",
@@ -35,7 +34,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// DOM-elementen
+const serverTitleText = document.getElementById("serverTitleText");
+const serverConnStatus = document.getElementById("serverConnStatus");
+const loginStatusMsg = document.getElementById("loginStatusMsg");
 const statusMsg = document.getElementById("statusMsg");
 const loginSection = document.getElementById("loginSection");
 const shellSection = document.getElementById("shellSection");
@@ -66,6 +67,11 @@ const goal48hInput = document.getElementById("goal48hInput");
 const maintenanceInput = document.getElementById("maintenanceInput");
 const usersList = document.getElementById("usersList");
 
+const focusTopBtn = document.getElementById("focusTopBtn");
+const focusFluidBtn = document.getElementById("focusFluidBtn");
+const focusAdminBtn = document.getElementById("focusAdminBtn");
+const taskbarClock = document.getElementById("taskbarClock");
+
 let currentGoal24h = 1000;
 let currentGoal48h = 2000;
 let activeUser = null;
@@ -75,7 +81,28 @@ function setStatus(text) {
   statusMsg.textContent = text || "";
 }
 
-// PWA Service Worker registreren
+function setLoginStatus(text) {
+  loginStatusMsg.textContent = text || "";
+}
+
+function updateClock() {
+  const now = new Date();
+  taskbarClock.textContent = now.toLocaleTimeString("nl-NL", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+focusTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+focusFluidBtn.addEventListener("click", () => {
+  moduleFluid.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+focusAdminBtn.addEventListener("click", () => {
+  adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
@@ -86,7 +113,6 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-// Kleur bepalen voor progress bar op basis van percentage
 function getBarColor(pct) {
   if (pct > 100) return "#ef4444";
   if (pct >= 80) return "#f59e0b";
@@ -103,26 +129,23 @@ function updateProgressBar(labelEl, barEl, currentMl, goalMl) {
   barEl.style.backgroundColor = getBarColor(pct);
 }
 
-// Vocht-invoer van de afgelopen 48 uur laden en berekenen voor 24u en 48u
 async function loadFluidIntake(userId) {
-  fluidHistoryList.innerHTML = "Vochtgegevens laden...";
+  fluidHistoryList.innerHTML = `<p class="muted">Vochtgegevens laden...</p>`;
 
   const nowMs = Date.now();
   const cutoff24h = nowMs - 24 * 60 * 60 * 1000;
   const cutoff48h = nowMs - 48 * 60 * 60 * 1000;
 
-  const q = query(
-    collection(db, "fluidIntake"),
-    where("userId", "==", userId),
-    orderBy("createdAt", "desc")
-  );
-
   let docsList = [];
   try {
+    const q = query(
+      collection(db, "fluidIntake"),
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc")
+    );
     const snap = await getDocs(q);
     docsList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   } catch (err) {
-    // Fallback als er nog geen samengestelde index is aangemaakt in Firestore
     const fallbackSnap = await getDocs(
       query(collection(db, "fluidIntake"), where("userId", "==", userId))
     );
@@ -140,9 +163,7 @@ async function loadFluidIntake(userId) {
   const recent48hItems = [];
 
   for (const item of docsList) {
-    const createdMs = item.createdAt?.toMillis
-      ? item.createdAt.toMillis()
-      : nowMs;
+    const createdMs = item.createdAt?.toMillis ? item.createdAt.toMillis() : nowMs;
     const ml = Number(item.amountMl) || 0;
 
     if (createdMs >= cutoff48h) {
@@ -195,7 +216,6 @@ async function loadFluidIntake(userId) {
   }
 }
 
-// Nieuwe vochtinvoer opslaan
 fluidForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!activeUser) return;
@@ -226,29 +246,26 @@ fluidForm.addEventListener("submit", async (e) => {
   }
 });
 
-// Inloggen
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  setStatus("Bezig met inloggen...");
+  setLoginStatus("Bezig met aanmelden...");
 
   const email = document.getElementById("emailInput").value.trim();
   const password = document.getElementById("passwordInput").value;
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    setStatus("");
+    setLoginStatus("");
   } catch (err) {
-    setStatus("Inloggen mislukt: " + err.message);
+    setLoginStatus("Aanmelden mislukt: " + err.message);
   }
 });
 
-// Uitloggen
 logoutBtn.addEventListener("click", async () => {
   await signOut(auth);
-  setStatus("Uitgelogd.");
+  setLoginStatus("Afgemeld.");
 });
 
-// Globale systeeminstellingen & vochtdoelen laden uit settings/app
 async function loadAppSettings() {
   const settingsRef = doc(db, "settings", "app");
   const snap = await getDoc(settingsRef);
@@ -260,9 +277,10 @@ async function loadAppSettings() {
     currentGoal24h = Number(data.goal24hMl) || 1000;
     currentGoal48h = Number(data.goal48hMl) || 2000;
 
+    serverTitleText.textContent = title;
     appBanner.textContent = maint
-      ? `${title} — Onderhoudsmodus is actief.`
-      : `${title} — Actief verbonden met Firebase.`;
+      ? `${title} — Onderhoudsmodus actief.`
+      : `${title} — Online via GitHub & Firestore.`;
 
     systemTitleInput.value = title;
     goal24hInput.value = currentGoal24h;
@@ -278,10 +296,9 @@ async function loadAppSettings() {
   }
 }
 
-// Instellingen & vochtdoelen opslaan als admin
 settingsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  setStatus("Instellingen opslaan...");
+  setStatus("Serverinstellingen opslaan...");
 
   try {
     await setDoc(
@@ -298,15 +315,14 @@ settingsForm.addEventListener("submit", async (e) => {
     if (activeUser && !moduleFluid.classList.contains("hidden")) {
       await loadFluidIntake(activeUser.uid);
     }
-    setStatus("Instellingen opgeslagen in Firestore.");
+    setStatus("Serverinstellingen opgeslagen.");
   } catch (err) {
     setStatus("Opslaan mislukt: " + err.message);
   }
 });
 
-// Gebruikers en rechten laden voor admin
 async function loadUsersForAdmin(currentUid) {
-  usersList.innerHTML = "Gebruikers laden...";
+  usersList.innerHTML = `<p class="muted">Gebruikers laden...</p>`;
   const snap = await getDocs(collection(db, "users"));
   usersList.innerHTML = "";
 
@@ -363,7 +379,6 @@ async function loadUsersForAdmin(currentUid) {
   });
 }
 
-// Schil opbouwen op basis van ingelogde gebruiker + Firestore-profiel
 async function renderUserShell(user) {
   activeUser = user;
   const userRef = doc(db, "users", user.uid);
@@ -386,13 +401,15 @@ async function renderUserShell(user) {
   const permissions = profile.permissions || {};
   activeIsAdmin = role === "admin";
 
-  welcomeTitle.textContent = `Welkom, ${profile.email || user.email || "gebruiker"}`;
+  welcomeTitle.textContent = `Sessie: ${profile.email || user.email || "gebruiker"}`;
   roleBadge.textContent = activeIsAdmin ? "ADMIN" : "GEBRUIKER";
+  serverConnStatus.textContent = `Ingelogd (${role})`;
 
   const showFluid = permissions.canViewData !== false || activeIsAdmin;
   const showReports = Boolean(permissions.canViewReports) || activeIsAdmin;
 
   moduleFluid.classList.toggle("hidden", !showFluid);
+  focusFluidBtn.classList.toggle("hidden", !showFluid);
   moduleReports.classList.toggle("hidden", !showReports);
   noModulesMsg.classList.toggle("hidden", showFluid || showReports);
 
@@ -404,20 +421,23 @@ async function renderUserShell(user) {
 
   if (activeIsAdmin) {
     adminSection.classList.remove("hidden");
+    focusAdminBtn.classList.remove("hidden");
     await loadUsersForAdmin(user.uid);
   } else {
     adminSection.classList.add("hidden");
+    focusAdminBtn.classList.add("hidden");
   }
 
   loginSection.classList.add("hidden");
   shellSection.classList.remove("hidden");
 }
 
-// Auth-status volgen
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     activeUser = null;
     activeIsAdmin = false;
+    serverConnStatus.textContent = "Afgesloten";
+    focusAdminBtn.classList.add("hidden");
     shellSection.classList.add("hidden");
     adminSection.classList.add("hidden");
     loginSection.classList.remove("hidden");
