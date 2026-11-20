@@ -3,8 +3,7 @@
   "short_name": "Wagt 2026",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#090e1a",
-  "theme_color": "#0b1120",
+  "background_color": "#081220",
+  "theme_color": "#081220",
   "icons": []
 }
