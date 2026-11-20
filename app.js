@@ -65,6 +65,12 @@ const label24h = document.getElementById("label24h");
 const bar24h = document.getElementById("bar24h");
 const label48h = document.getElementById("label48h");
 const bar48h = document.getElementById("bar48h");
+
+const quickTilesGrid = document.getElementById("quickTilesGrid");
+const quickTileForm = document.getElementById("quickTileForm");
+const tileProductInput = document.getElementById("tileProductInput");
+const tileMlInput = document.getElementById("tileMlInput");
+
 const fluidForm = document.getElementById("fluidForm");
 const fluidMlInput = document.getElementById("fluidMlInput");
 const fluidNoteInput = document.getElementById("fluidNoteInput");
@@ -89,6 +95,7 @@ let activeTab = "dashboard";
 let unsubUserProfile = null;
 let unsubSettings = null;
 let unsubFluid = null;
+let unsubQuickTiles = null;
 let unsubAllUsers = null;
 let unsubExplorer = null;
 
@@ -97,6 +104,7 @@ function cleanupListeners() {
     unsubUserProfile,
     unsubSettings,
     unsubFluid,
+    unsubQuickTiles,
     unsubAllUsers,
     unsubExplorer
   ]) {
@@ -105,6 +113,7 @@ function cleanupListeners() {
   unsubUserProfile = null;
   unsubSettings = null;
   unsubFluid = null;
+  unsubQuickTiles = null;
   unsubAllUsers = null;
   unsubExplorer = null;
 }
@@ -169,6 +178,95 @@ function updateProgressBar(labelEl, barEl, currentMl, goalMl) {
   barEl.style.width = `${visualWidth}%`;
   barEl.style.backgroundColor = getBarColor(pct);
 }
+
+// Schrijf vochtinname weg naar Firestore voor de ingelogde gebruiker
+async function logFluidAmount(amountMl, note = "") {
+  if (!activeUser) return;
+  const ml = Number(amountMl);
+  if (!ml || ml <= 0) return;
+
+  try {
+    await addDoc(collection(db, "fluidIntake"), {
+      userId: activeUser.uid,
+      email: activeUser.email || "",
+      amountMl: ml,
+      note: (note || "").trim(),
+      createdAt: Timestamp.now()
+    });
+    showToast(`${ml} ml${note ? ` (${note})` : ""} opgeslagen in jouw account.`);
+  } catch (err) {
+    showToast("Opslaan mislukt: " + err.message);
+  }
+}
+
+// Live eigen snelkeuze tegels laden uit users/{uid}/quickTiles
+function subscribeQuickTiles(userId) {
+  if (typeof unsubQuickTiles === "function") unsubQuickTiles();
+
+  const tilesCol = collection(db, "users", userId, "quickTiles");
+  unsubQuickTiles = onSnapshot(tilesCol, (snap) => {
+    const tiles = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+    quickTilesGrid.innerHTML = "";
+    if (tiles.length === 0) {
+      quickTilesGrid.innerHTML = `<div class="item-sub">Nog geen eigen tegels. Maak er hieronder één aan!</div>`;
+      return;
+    }
+
+    for (const tile of tiles) {
+      const card = document.createElement("div");
+      card.className = "quick-tile";
+      card.innerHTML = `
+        <button type="button" class="quick-tile-add">
+          <span class="quick-tile-product">${tile.product || "Vocht"}</span>
+          <span class="quick-tile-ml">${tile.amountMl} ml</span>
+        </button>
+        <button type="button" class="quick-tile-del">Verwijder</button>
+      `;
+
+      card.querySelector(".quick-tile-add").addEventListener("click", async () => {
+        await logFluidAmount(tile.amountMl, tile.product || "");
+      });
+
+      card.querySelector(".quick-tile-del").addEventListener("click", async () => {
+        try {
+          await deleteDoc(doc(db, "users", userId, "quickTiles", tile.id));
+          showToast(`Tegel "${tile.product}" verwijderd.`);
+        } catch (err) {
+          showToast("Verwijderen mislukt: " + err.message);
+        }
+      });
+
+      quickTilesGrid.appendChild(card);
+    }
+  });
+}
+
+// Nieuwe snelkeuze tegel opslaan onder users/{uid}/quickTiles
+quickTileForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!activeUser) return;
+
+  const product = tileProductInput.value.trim();
+  const amountMl = Number(tileMlInput.value);
+  if (!product || !amountMl || amountMl <= 0) return;
+
+  try {
+    const tileId = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    await setDoc(doc(db, "users", activeUser.uid, "quickTiles", tileId), {
+      product,
+      amountMl,
+      createdAt: Date.now()
+    });
+    tileProductInput.value = "";
+    tileMlInput.value = "";
+    showToast(`Tegel "${product}" (${amountMl} ml) opgeslagen.`);
+  } catch (err) {
+    showToast("Tegel opslaan mislukt: " + err.message);
+  }
+});
 
 function renderFluidCalculations() {
   const nowMs = Date.now();
@@ -253,26 +351,13 @@ function subscribeFluidIntake(userId) {
 
 fluidForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!activeUser) return;
-
   const amountMl = Number(fluidMlInput.value);
   const note = fluidNoteInput.value.trim();
   if (!amountMl || amountMl <= 0) return;
 
-  try {
-    await addDoc(collection(db, "fluidIntake"), {
-      userId: activeUser.uid,
-      email: activeUser.email || "",
-      amountMl,
-      note,
-      createdAt: Timestamp.now()
-    });
-    fluidMlInput.value = "";
-    fluidNoteInput.value = "";
-    showToast("Vochtinname opgeslagen in Firestore.");
-  } catch (err) {
-    showToast("Opslaan mislukt: " + err.message);
-  }
+  await logFluidAmount(amountMl, note);
+  fluidMlInput.value = "";
+  fluidNoteInput.value = "";
 });
 
 loginForm.addEventListener("submit", async (e) => {
@@ -309,7 +394,7 @@ function subscribeAppSettings() {
     loginBrandTitle.textContent = title;
     systemBannerText.textContent = maint
       ? `${title} — Onderhoudsmodus is actief.`
-      : `${title} — Live verbonden met Cloud Firestore.`;
+      : `${title} — Privé gesynct met Cloud Firestore.`;
 
     systemTitleInput.value = title;
     goal24hInput.value = currentGoal24h;
@@ -394,14 +479,21 @@ function subscribeUsersForAdmin() {
   });
 }
 
-function subscribeDbExplorer(colName) {
+function subscribeDbExplorer(colName, userId) {
   if (typeof unsubExplorer === "function") unsubExplorer();
   dbExplorerList.innerHTML = `<div class="item-sub">Records laden uit ${colName}...</div>`;
 
-  unsubExplorer = onSnapshot(collection(db, colName), (snap) => {
+  const targetRef =
+    colName === "fluidIntake"
+      ? query(collection(db, "fluidIntake"), where("userId", "==", userId))
+      : colName === "users"
+      ? query(collection(db, "users"), where("__name__", "==", userId))
+      : collection(db, colName);
+
+  unsubExplorer = onSnapshot(targetRef, (snap) => {
     dbExplorerList.innerHTML = "";
     if (snap.empty) {
-      dbExplorerList.innerHTML = `<div class="item-sub">Geen documenten in "${colName}".</div>`;
+      dbExplorerList.innerHTML = `<div class="item-sub">Geen eigen documenten in "${colName}".</div>`;
       return;
     }
 
@@ -422,17 +514,20 @@ function subscribeDbExplorer(colName) {
           <strong>ID: ${docId}</strong>
           <pre class="db-json">${JSON.stringify(clean, null, 2)}</pre>
         </div>
-        <button type="button" class="btn-danger">Verwijder</button>
+        ${colName === "fluidIntake" ? `<button type="button" class="btn-danger">Verwijder</button>` : ""}
       `;
 
-      row.querySelector("button").addEventListener("click", async () => {
-        try {
-          await deleteDoc(doc(db, colName, docId));
-          showToast(`Document ${docId} verwijderd.`);
-        } catch (err) {
-          showToast("Verwijderen mislukt: " + err.message);
-        }
-      });
+      const delBtn = row.querySelector("button.btn-danger");
+      if (delBtn) {
+        delBtn.addEventListener("click", async () => {
+          try {
+            await deleteDoc(doc(db, "fluidIntake", docId));
+            showToast(`Document ${docId} verwijderd.`);
+          } catch (err) {
+            showToast("Verwijderen mislukt: " + err.message);
+          }
+        });
+      }
 
       dbExplorerList.appendChild(row);
     });
@@ -440,7 +535,9 @@ function subscribeDbExplorer(colName) {
 }
 
 dbCollectionSelect.addEventListener("change", () => {
-  if (activeIsAdmin) subscribeDbExplorer(dbCollectionSelect.value);
+  if (activeIsAdmin && activeUser) {
+    subscribeDbExplorer(dbCollectionSelect.value, activeUser.uid);
+  }
 });
 
 function subscribeUserShell(user) {
@@ -466,7 +563,7 @@ function subscribeUserShell(user) {
 
     welcomeHeading.textContent = `Welkom, ${profile.email || user.email || "gebruiker"}`;
     headerRoleBadge.textContent = activeIsAdmin ? "ADMIN" : "GEBRUIKER";
-    headerSub.textContent = `Sessie actief • ${profile.email || ""}`;
+    headerSub.textContent = `Privé sessie • ${profile.email || ""}`;
 
     const canFluid = permissions.canViewData !== false || activeIsAdmin;
     const canReports = Boolean(permissions.canViewReports) || activeIsAdmin;
@@ -477,15 +574,18 @@ function subscribeUserShell(user) {
 
     if (canFluid) {
       subscribeFluidIntake(user.uid);
-    } else if (typeof unsubFluid === "function") {
-      unsubFluid();
+      subscribeQuickTiles(user.uid);
+    } else {
+      if (typeof unsubFluid === "function") unsubFluid();
+      if (typeof unsubQuickTiles === "function") unsubQuickTiles();
       unsubFluid = null;
+      unsubQuickTiles = null;
     }
 
     if (activeIsAdmin) {
       navAdminBtn.classList.remove("hidden");
       subscribeUsersForAdmin();
-      subscribeDbExplorer(dbCollectionSelect.value);
+      subscribeDbExplorer(dbCollectionSelect.value, user.uid);
     } else {
       navAdminBtn.classList.add("hidden");
       if (activeTab === "admin") switchTab("dashboard");
