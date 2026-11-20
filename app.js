@@ -33,23 +33,33 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // DOM-elementen
-const serverTitleText = document.getElementById("serverTitleText");
-const liveDbBadge = document.getElementById("liveDbBadge");
-const dbStatsText = document.getElementById("dbStatsText");
-const serverConnStatus = document.getElementById("serverConnStatus");
-const loginStatusMsg = document.getElementById("loginStatusMsg");
-const statusMsg = document.getElementById("statusMsg");
-const loginSection = document.getElementById("loginSection");
-const shellSection = document.getElementById("shellSection");
+const loginView = document.getElementById("loginView");
+const shellView = document.getElementById("shellView");
 const loginForm = document.getElementById("loginForm");
-const logoutBtn = document.getElementById("logoutBtn");
-const welcomeTitle = document.getElementById("welcomeTitle");
-const roleBadge = document.getElementById("roleBadge");
-const appBanner = document.getElementById("appBanner");
+const loginStatus = document.getElementById("loginStatus");
+const globalToast = document.getElementById("globalToast");
 
-const moduleFluid = document.getElementById("moduleFluid");
-const moduleReports = document.getElementById("moduleReports");
-const noModulesMsg = document.getElementById("noModulesMsg");
+const headerTitle = document.getElementById("headerTitle");
+const loginBrandTitle = document.getElementById("loginBrandTitle");
+const headerSub = document.getElementById("headerSub");
+const headerRoleBadge = document.getElementById("headerRoleBadge");
+const clockBadge = document.getElementById("clockBadge");
+const welcomeHeading = document.getElementById("welcomeHeading");
+const systemBannerText = document.getElementById("systemBannerText");
+
+const kpi24h = document.getElementById("kpi24h");
+const kpi48h = document.getElementById("kpi48h");
+const permFluidStatus = document.getElementById("permFluidStatus");
+const permReportsRow = document.getElementById("permReportsRow");
+
+const navDashboardBtn = document.getElementById("navDashboardBtn");
+const navFluidBtn = document.getElementById("navFluidBtn");
+const navAdminBtn = document.getElementById("navAdminBtn");
+const railLogoutBtn = document.getElementById("railLogoutBtn");
+
+const tabDashboard = document.getElementById("tabDashboard");
+const tabFluid = document.getElementById("tabFluid");
+const tabAdmin = document.getElementById("tabAdmin");
 
 const label24h = document.getElementById("label24h");
 const bar24h = document.getElementById("bar24h");
@@ -60,29 +70,22 @@ const fluidMlInput = document.getElementById("fluidMlInput");
 const fluidNoteInput = document.getElementById("fluidNoteInput");
 const fluidHistoryList = document.getElementById("fluidHistoryList");
 
-const adminSection = document.getElementById("adminSection");
 const settingsForm = document.getElementById("settingsForm");
 const systemTitleInput = document.getElementById("systemTitleInput");
 const goal24hInput = document.getElementById("goal24hInput");
 const goal48hInput = document.getElementById("goal48hInput");
 const maintenanceInput = document.getElementById("maintenanceInput");
 const usersList = document.getElementById("usersList");
-
 const dbCollectionSelect = document.getElementById("dbCollectionSelect");
 const dbExplorerList = document.getElementById("dbExplorerList");
-
-const focusTopBtn = document.getElementById("focusTopBtn");
-const focusFluidBtn = document.getElementById("focusFluidBtn");
-const focusAdminBtn = document.getElementById("focusAdminBtn");
-const taskbarClock = document.getElementById("taskbarClock");
 
 let currentGoal24h = 1000;
 let currentGoal48h = 2000;
 let latestFluidDocs = [];
 let activeUser = null;
 let activeIsAdmin = false;
+let activeTab = "dashboard";
 
-// Actieve realtime Firestore-listeners opslaan om bij uitloggen netjes op te ruimen
 let unsubUserProfile = null;
 let unsubSettings = null;
 let unsubFluid = null;
@@ -106,17 +109,17 @@ function cleanupListeners() {
   unsubExplorer = null;
 }
 
-function setStatus(text) {
-  statusMsg.textContent = text || "";
+function showToast(msg) {
+  globalToast.textContent = msg || "";
 }
 
-function setLoginStatus(text) {
-  loginStatusMsg.textContent = text || "";
+function showLoginToast(msg) {
+  loginStatus.textContent = msg || "";
 }
 
 function updateClock() {
   const now = new Date();
-  taskbarClock.textContent = now.toLocaleTimeString("nl-NL", {
+  clockBadge.textContent = now.toLocaleTimeString("nl-NL", {
     hour: "2-digit",
     minute: "2-digit"
   });
@@ -124,13 +127,22 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 30000);
 
-focusTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-focusFluidBtn.addEventListener("click", () => {
-  moduleFluid.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-focusAdminBtn.addEventListener("click", () => {
-  adminSection.scrollIntoView({ behavior: "smooth", block: "start" });
-});
+function switchTab(tabName) {
+  if (tabName === "admin" && !activeIsAdmin) return;
+  activeTab = tabName;
+
+  tabDashboard.classList.toggle("hidden", tabName !== "dashboard");
+  tabFluid.classList.toggle("hidden", tabName !== "fluid");
+  tabAdmin.classList.toggle("hidden", tabName !== "admin");
+
+  navDashboardBtn.classList.toggle("active", tabName === "dashboard");
+  navFluidBtn.classList.toggle("active", tabName === "fluid");
+  navAdminBtn.classList.toggle("active", tabName === "admin");
+}
+
+navDashboardBtn.addEventListener("click", () => switchTab("dashboard"));
+navFluidBtn.addEventListener("click", () => switchTab("fluid"));
+navAdminBtn.addEventListener("click", () => switchTab("admin"));
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
@@ -158,8 +170,7 @@ function updateProgressBar(labelEl, barEl, currentMl, goalMl) {
   barEl.style.backgroundColor = getBarColor(pct);
 }
 
-// Bereken 24u en 48u totalen + lijst op basis van actuele records en doelen
-function renderFluidCalculations(userId) {
+function renderFluidCalculations() {
   const nowMs = Date.now();
   const cutoff24h = nowMs - 24 * 60 * 60 * 1000;
   const cutoff48h = nowMs - 48 * 60 * 60 * 1000;
@@ -187,12 +198,14 @@ function renderFluidCalculations(userId) {
     }
   }
 
+  kpi24h.textContent = `${sum24h} ml`;
+  kpi48h.textContent = `${sum48h} ml`;
+
   updateProgressBar(label24h, bar24h, sum24h, currentGoal24h);
   updateProgressBar(label48h, bar48h, sum48h, currentGoal48h);
-  dbStatsText.textContent = `24u: ${sum24h} ml | 48u: ${sum48h} ml`;
 
   if (recent48hItems.length === 0) {
-    fluidHistoryList.innerHTML = `<p class="muted">Geen vochtrecords in de afgelopen 48 uur.</p>`;
+    fluidHistoryList.innerHTML = `<div class="item-sub">Geen vochtinvoer in de afgelopen 48 uur.</div>`;
     return;
   }
 
@@ -206,21 +219,21 @@ function renderFluidCalculations(userId) {
     });
 
     const row = document.createElement("div");
-    row.className = "log-item";
+    row.className = "list-item";
     row.innerHTML = `
       <div>
         <strong>${entry.amountMl} ml</strong>${entry.note ? ` — ${entry.note}` : ""}
-        <div class="muted">${dt}</div>
+        <div class="item-sub">${dt}</div>
       </div>
-      <button type="button" class="danger">Verwijder</button>
+      <button type="button" class="btn-danger">Verwijder</button>
     `;
 
     row.querySelector("button").addEventListener("click", async () => {
       try {
         await deleteDoc(doc(db, "fluidIntake", entry.id));
-        setStatus("Record verwijderd uit database.");
+        showToast("Vochtrecord verwijderd.");
       } catch (err) {
-        setStatus("Verwijderen mislukt: " + err.message);
+        showToast("Verwijderen mislukt: " + err.message);
       }
     });
 
@@ -228,37 +241,24 @@ function renderFluidCalculations(userId) {
   }
 }
 
-// Live luisteren naar vochtrecords van de ingelogde gebruiker
 function subscribeFluidIntake(userId) {
   if (typeof unsubFluid === "function") unsubFluid();
 
   const q = query(collection(db, "fluidIntake"), where("userId", "==", userId));
-  unsubFluid = onSnapshot(
-    q,
-    (snap) => {
-      latestFluidDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      renderFluidCalculations(userId);
-    },
-    (err) => {
-      setStatus("Live vocht-listener fout: " + err.message);
-    }
-  );
+  unsubFluid = onSnapshot(q, (snap) => {
+    latestFluidDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderFluidCalculations();
+  });
 }
 
-// Nieuw vochtrecord wegschrijven naar Firestore
 fluidForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!activeUser) return;
 
   const amountMl = Number(fluidMlInput.value);
   const note = fluidNoteInput.value.trim();
+  if (!amountMl || amountMl <= 0) return;
 
-  if (!amountMl || amountMl <= 0) {
-    setStatus("Vul een geldige hoeveelheid in ml in.");
-    return;
-  }
-
-  setStatus("Record wegschrijven naar database...");
   try {
     await addDoc(collection(db, "fluidIntake"), {
       userId: activeUser.uid,
@@ -269,34 +269,32 @@ fluidForm.addEventListener("submit", async (e) => {
     });
     fluidMlInput.value = "";
     fluidNoteInput.value = "";
-    setStatus("Record opgeslagen in Firestore.");
+    showToast("Vochtinname opgeslagen in Firestore.");
   } catch (err) {
-    setStatus("Opslaan mislukt: " + err.message);
+    showToast("Opslaan mislukt: " + err.message);
   }
 });
 
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  setLoginStatus("Bezig met aanmelden...");
-
+  showLoginToast("Bezig met aanmelden...");
   const email = document.getElementById("emailInput").value.trim();
   const password = document.getElementById("passwordInput").value;
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    setLoginStatus("");
+    showLoginToast("");
   } catch (err) {
-    setLoginStatus("Aanmelden mislukt: " + err.message);
+    showLoginToast("Aanmelden mislukt: " + err.message);
   }
 });
 
-logoutBtn.addEventListener("click", async () => {
+railLogoutBtn.addEventListener("click", async () => {
   cleanupListeners();
   await signOut(auth);
-  setLoginStatus("Afgemeld.");
+  showLoginToast("Uitgelogd.");
 });
 
-// Live luisteren naar settings/app
 function subscribeAppSettings() {
   if (typeof unsubSettings === "function") unsubSettings();
 
@@ -307,9 +305,10 @@ function subscribeAppSettings() {
     currentGoal24h = Number(data.goal24hMl) || 1000;
     currentGoal48h = Number(data.goal48hMl) || 2000;
 
-    serverTitleText.textContent = title;
-    appBanner.textContent = maint
-      ? `${title} — Onderhoudsmodus actief (Live DB).`
+    headerTitle.textContent = title;
+    loginBrandTitle.textContent = title;
+    systemBannerText.textContent = maint
+      ? `${title} — Onderhoudsmodus is actief.`
       : `${title} — Live verbonden met Cloud Firestore.`;
 
     systemTitleInput.value = title;
@@ -317,16 +316,12 @@ function subscribeAppSettings() {
     goal48hInput.value = currentGoal48h;
     maintenanceInput.checked = maint;
 
-    if (activeUser && !moduleFluid.classList.contains("hidden")) {
-      renderFluidCalculations(activeUser.uid);
-    }
+    renderFluidCalculations();
   });
 }
 
 settingsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  setStatus("Serverinstellingen opslaan in database...");
-
   try {
     await setDoc(
       doc(db, "settings", "app"),
@@ -338,13 +333,12 @@ settingsForm.addEventListener("submit", async (e) => {
       },
       { merge: true }
     );
-    setStatus("Serverinstellingen live bijgewerkt.");
+    showToast("Instellingen opgeslagen.");
   } catch (err) {
-    setStatus("Opslaan mislukt: " + err.message);
+    showToast("Opslaan mislukt: " + err.message);
   }
 });
 
-// Live gebruikersbeheer voor admin
 function subscribeUsersForAdmin() {
   if (typeof unsubAllUsers === "function") unsubAllUsers();
 
@@ -356,112 +350,102 @@ function subscribeUsersForAdmin() {
       const uid = userDoc.id;
       const perms = u.permissions || {};
 
-      const wrapper = document.createElement("div");
-      wrapper.className = "user-item";
-      wrapper.innerHTML = `
-        <div><strong>${u.email || uid}</strong> <span class="badge">${(u.role || "user").toUpperCase()}</span></div>
-        <div style="margin-top: 8px;">
-          <label>Rol</label>
-          <select data-field="role">
-            <option value="user" ${u.role !== "admin" ? "selected" : ""}>user</option>
-            <option value="admin" ${u.role === "admin" ? "selected" : ""}>admin</option>
-          </select>
+      const card = document.createElement("div");
+      card.className = "user-card";
+      card.innerHTML = `
+        <div class="user-head">
+          <strong>${u.email || uid}</strong>
+          <span class="role-pill">${(u.role || "user").toUpperCase()}</span>
         </div>
+        <label>Rol</label>
+        <select data-field="role">
+          <option value="user" ${u.role !== "admin" ? "selected" : ""}>user</option>
+          <option value="admin" ${u.role === "admin" ? "selected" : ""}>admin</option>
+        </select>
         <div class="checkbox-row">
           <input type="checkbox" id="perm_data_${uid}" data-perm="canViewData" ${perms.canViewData !== false ? "checked" : ""} />
-          <label for="perm_data_${uid}">Recht: Vocht intake &amp; data</label>
+          <label for="perm_data_${uid}">Recht: Vocht intake (24u / 48u)</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="perm_rep_${uid}" data-perm="canViewReports" ${perms.canViewReports ? "checked" : ""} />
-          <label for="perm_rep_${uid}">Recht: Overzichten bekijken</label>
+          <label for="perm_rep_${uid}">Recht: Overzichten</label>
         </div>
-        <button type="button">Rechten opslaan</button>
+        <button type="button" style="width: 100%;">Rechten opslaan</button>
       `;
 
-      wrapper.querySelector("button").addEventListener("click", async () => {
-        const selectedRole = wrapper.querySelector('select[data-field="role"]').value;
-        const canViewData = wrapper.querySelector('input[data-perm="canViewData"]').checked;
-        const canViewReports = wrapper.querySelector('input[data-perm="canViewReports"]').checked;
+      card.querySelector("button").addEventListener("click", async () => {
+        const selectedRole = card.querySelector('select[data-field="role"]').value;
+        const canViewData = card.querySelector('input[data-perm="canViewData"]').checked;
+        const canViewReports = card.querySelector('input[data-perm="canViewReports"]').checked;
 
         try {
           await updateDoc(doc(db, "users", uid), {
             role: selectedRole,
-            permissions: {
-              canViewData,
-              canViewReports
-            }
+            permissions: { canViewData, canViewReports }
           });
-          setStatus(`Rechten bijgewerkt voor ${u.email || uid}.`);
+          showToast(`Rechten bijgewerkt voor ${u.email || uid}.`);
         } catch (err) {
-          setStatus("Rechten opslaan mislukt: " + err.message);
+          showToast("Rechten opslaan mislukt: " + err.message);
         }
       });
 
-      usersList.appendChild(wrapper);
+      usersList.appendChild(card);
     });
   });
 }
 
-// Live Database Explorer voor admin (bekijken en verwijderen van records)
 function subscribeDbExplorer(colName) {
   if (typeof unsubExplorer === "function") unsubExplorer();
-  dbExplorerList.innerHTML = `<p class="muted">Records laden uit ${colName}...</p>`;
+  dbExplorerList.innerHTML = `<div class="item-sub">Records laden uit ${colName}...</div>`;
 
   unsubExplorer = onSnapshot(collection(db, colName), (snap) => {
     dbExplorerList.innerHTML = "";
-
     if (snap.empty) {
-      dbExplorerList.innerHTML = `<p class="muted">Geen records in collectie "${colName}".</p>`;
+      dbExplorerList.innerHTML = `<div class="item-sub">Geen documenten in "${colName}".</div>`;
       return;
     }
 
     snap.forEach((docSnap) => {
       const docId = docSnap.id;
-      const rawData = docSnap.data();
-      const formatted = Object.fromEntries(
-        Object.entries(rawData).map(([k, v]) => [
+      const raw = docSnap.data();
+      const clean = Object.fromEntries(
+        Object.entries(raw).map(([k, v]) => [
           k,
           v && typeof v.toDate === "function" ? v.toDate().toLocaleString("nl-NL") : v
         ])
       );
 
-      const item = document.createElement("div");
-      item.className = "db-record";
-      item.innerHTML = `
-        <div style="flex: 1; min-width: 200px;">
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div style="flex: 1; min-width: 220px;">
           <strong>ID: ${docId}</strong>
-          <pre class="json-box">${JSON.stringify(formatted, null, 2)}</pre>
+          <pre class="db-json">${JSON.stringify(clean, null, 2)}</pre>
         </div>
-        <div class="btn-group">
-          <button type="button" class="danger">Verwijder</button>
-        </div>
+        <button type="button" class="btn-danger">Verwijder</button>
       `;
 
-      item.querySelector("button").addEventListener("click", async () => {
+      row.querySelector("button").addEventListener("click", async () => {
         try {
           await deleteDoc(doc(db, colName, docId));
-          setStatus(`Document ${docId} verwijderd uit ${colName}.`);
+          showToast(`Document ${docId} verwijderd.`);
         } catch (err) {
-          setStatus("Verwijderen mislukt: " + err.message);
+          showToast("Verwijderen mislukt: " + err.message);
         }
       });
 
-      dbExplorerList.appendChild(item);
+      dbExplorerList.appendChild(row);
     });
   });
 }
 
 dbCollectionSelect.addEventListener("change", () => {
-  if (activeIsAdmin) {
-    subscribeDbExplorer(dbCollectionSelect.value);
-  }
+  if (activeIsAdmin) subscribeDbExplorer(dbCollectionSelect.value);
 });
 
-// Live luisteren naar eigen gebruikersprofiel & rechten
 function subscribeUserShell(user) {
   activeUser = user;
   const userRef = doc(db, "users", user.uid);
-
   subscribeAppSettings();
 
   if (typeof unsubUserProfile === "function") unsubUserProfile();
@@ -470,10 +454,7 @@ function subscribeUserShell(user) {
       await setDoc(userRef, {
         email: user.email || "",
         role: "user",
-        permissions: {
-          canViewData: true,
-          canViewReports: false
-        }
+        permissions: { canViewData: true, canViewReports: false }
       });
       return;
     }
@@ -483,20 +464,18 @@ function subscribeUserShell(user) {
     const permissions = profile.permissions || {};
     activeIsAdmin = role === "admin";
 
-    welcomeTitle.textContent = `Sessie: ${profile.email || user.email || "gebruiker"}`;
-    roleBadge.textContent = activeIsAdmin ? "ADMIN" : "GEBRUIKER";
-    serverConnStatus.textContent = `Online (${role})`;
-    liveDbBadge.classList.remove("hidden");
+    welcomeHeading.textContent = `Welkom, ${profile.email || user.email || "gebruiker"}`;
+    headerRoleBadge.textContent = activeIsAdmin ? "ADMIN" : "GEBRUIKER";
+    headerSub.textContent = `Sessie actief • ${profile.email || ""}`;
 
-    const showFluid = permissions.canViewData !== false || activeIsAdmin;
-    const showReports = Boolean(permissions.canViewReports) || activeIsAdmin;
+    const canFluid = permissions.canViewData !== false || activeIsAdmin;
+    const canReports = Boolean(permissions.canViewReports) || activeIsAdmin;
 
-    moduleFluid.classList.toggle("hidden", !showFluid);
-    focusFluidBtn.classList.toggle("hidden", !showFluid);
-    moduleReports.classList.toggle("hidden", !showReports);
-    noModulesMsg.classList.toggle("hidden", showFluid || showReports);
+    navFluidBtn.classList.toggle("hidden", !canFluid);
+    permFluidStatus.textContent = canFluid ? "Actief" : "Geen recht";
+    permReportsRow.classList.toggle("hidden", !canReports);
 
-    if (showFluid) {
+    if (canFluid) {
       subscribeFluidIntake(user.uid);
     } else if (typeof unsubFluid === "function") {
       unsubFluid();
@@ -504,19 +483,19 @@ function subscribeUserShell(user) {
     }
 
     if (activeIsAdmin) {
-      adminSection.classList.remove("hidden");
-      focusAdminBtn.classList.remove("hidden");
+      navAdminBtn.classList.remove("hidden");
       subscribeUsersForAdmin();
       subscribeDbExplorer(dbCollectionSelect.value);
     } else {
-      adminSection.classList.add("hidden");
-      focusAdminBtn.classList.add("hidden");
+      navAdminBtn.classList.add("hidden");
+      if (activeTab === "admin") switchTab("dashboard");
       if (typeof unsubAllUsers === "function") unsubAllUsers();
       if (typeof unsubExplorer === "function") unsubExplorer();
     }
 
-    loginSection.classList.add("hidden");
-    shellSection.classList.remove("hidden");
+    loginView.classList.add("hidden");
+    shellView.classList.remove("hidden");
+    switchTab(activeTab);
   });
 }
 
@@ -526,17 +505,9 @@ onAuthStateChanged(auth, (user) => {
     activeUser = null;
     activeIsAdmin = false;
     latestFluidDocs = [];
-    liveDbBadge.classList.add("hidden");
-    serverConnStatus.textContent = "Afgesloten";
-    dbStatsText.textContent = "Firestore: cloudsysteem-wagt-2026";
-    focusAdminBtn.classList.add("hidden");
-    shellSection.classList.add("hidden");
-    adminSection.classList.add("hidden");
-    loginSection.classList.remove("hidden");
+    shellView.classList.add("hidden");
+    loginView.classList.remove("hidden");
     return;
   }
-
-  setStatus("Verbinding maken met live database...");
   subscribeUserShell(user);
-  setStatus("");
 });
