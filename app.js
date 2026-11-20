@@ -27,7 +27,18 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// DOM-elementen
+const PIN_STORAGE_KEY = "wagt_2026_pin_locked";
+const DEFAULT_PIN = "1234";
+
+// DOM-elementen voor volledige pincode-vergrendeling
+const pinLockOverlay = document.getElementById("pinLockOverlay");
+const pinDisplayInput = document.getElementById("pinDisplayInput");
+const pinClearBtn = document.getElementById("pinClearBtn");
+const pinUnlockBtn = document.getElementById("pinUnlockBtn");
+const pinStatusMsg = document.getElementById("pinStatusMsg");
+const lockScreenBtn = document.getElementById("lockScreenBtn");
+
+// DOM-elementen voor schil & beheer
 const topTitleText = document.getElementById("topTitleText");
 const topConnStatus = document.getElementById("topConnStatus");
 const loginSection = document.getElementById("loginSection");
@@ -54,6 +65,7 @@ const pendingUsersList = document.getElementById("pendingUsersList");
 const allUsersList = document.getElementById("allUsersList");
 const settingsForm = document.getElementById("settingsForm");
 const systemTitleInput = document.getElementById("systemTitleInput");
+const unlockPinInput = document.getElementById("unlockPinInput");
 const maintenanceInput = document.getElementById("maintenanceInput");
 
 const taskShellBtn = document.getElementById("taskShellBtn");
@@ -63,10 +75,73 @@ const taskClock = document.getElementById("taskClock");
 let activeUser = null;
 let activeIsAdmin = false;
 let activeView = "shell";
+let configuredUnlockPin = DEFAULT_PIN;
+let isPinLocked = localStorage.getItem(PIN_STORAGE_KEY) !== "false";
 
 let unsubMe = null;
 let unsubSettings = null;
 let unsubUsers = null;
+
+function applyPinLockState(locked) {
+  isPinLocked = Boolean(locked);
+  localStorage.setItem(PIN_STORAGE_KEY, isPinLocked ? "true" : "false");
+  pinLockOverlay.classList.toggle("hidden", !isPinLocked);
+  if (isPinLocked) {
+    pinDisplayInput.value = "";
+    pinStatusMsg.textContent = "";
+    pinStatusMsg.classList.remove("error-text");
+    setTimeout(() => pinDisplayInput.focus(), 50);
+  }
+}
+
+// Direct bij laden vergrendelstand toepassen (blijft aan bij refresh)
+applyPinLockState(isPinLocked);
+
+window.addEventListener("beforeunload", (event) => {
+  if (isPinLocked) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+
+document.querySelectorAll(".key-btn[data-digit]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const digit = btn.getAttribute("data-digit") || "";
+    if (pinDisplayInput.value.length < 10) {
+      pinDisplayInput.value += digit;
+    }
+  });
+});
+
+pinClearBtn.addEventListener("click", () => {
+  pinDisplayInput.value = "";
+  pinStatusMsg.textContent = "";
+});
+
+function attemptPinUnlock() {
+  const entered = pinDisplayInput.value.trim();
+  const expected = configuredUnlockPin || DEFAULT_PIN;
+
+  if (entered === expected) {
+    applyPinLockState(false);
+  } else {
+    pinDisplayInput.value = "";
+    pinStatusMsg.textContent = "Onjuiste pincode.";
+    pinStatusMsg.classList.add("error-text");
+  }
+}
+
+pinUnlockBtn.addEventListener("click", attemptPinUnlock);
+pinDisplayInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    attemptPinUnlock();
+  }
+});
+
+lockScreenBtn.addEventListener("click", () => {
+  applyPinLockState(true);
+});
 
 function cleanupListeners() {
   for (const fn of [unsubMe, unsubSettings, unsubUsers]) {
@@ -308,6 +383,7 @@ function subscribeSettings() {
     const data = snap.exists() ? snap.data() : {};
     const title = data.systemTitle || "Cloudsysteem Wagt 2026";
     const maint = Boolean(data.maintenanceMode);
+    configuredUnlockPin = data.unlockPin ? String(data.unlockPin) : DEFAULT_PIN;
 
     topTitleText.textContent = title;
     appBanner.textContent = maint
@@ -315,22 +391,31 @@ function subscribeSettings() {
       : `${title} — Online verbonden met Cloud Firestore.`;
 
     systemTitleInput.value = title;
+    unlockPinInput.value = configuredUnlockPin;
     maintenanceInput.checked = maint;
   });
 }
 
 settingsForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const newPin = unlockPinInput.value.trim();
+  if (!/^\d{4,10}$/.test(newPin)) {
+    setStatus("Pincode moet uit 4 tot 10 cijfers bestaan.");
+    return;
+  }
+
   try {
     await setDoc(
       doc(db, "settings", "app"),
       {
         systemTitle: systemTitleInput.value.trim(),
+        unlockPin: newPin,
         maintenanceMode: maintenanceInput.checked
       },
       { merge: true }
     );
-    setStatus("Systeeminstellingen opgeslagen.");
+    configuredUnlockPin = newPin;
+    setStatus("Systeem- en pincode-instellingen opgeslagen.");
   } catch (err) {
     setStatus("Opslaan mislukt: " + err.message);
   }
@@ -346,7 +431,7 @@ function showGate(mode, email) {
     gateTitle.textContent = "Account geblokkeerd";
     gateBadge.textContent = "GEBLOKKEERD";
     gateBadge.className = "badge blocked";
-    gateMessage.textContent = `Het account ${email || ""} is geblokkeerd door een beheerder. Neem contact op met de admin.`;
+    gateMessage.textContent = `Het account ${email || ""} is geblokkeerd door een beheerder.`;
     topConnStatus.textContent = "Geblokkeerd";
   } else {
     gateTitle.textContent = "Wacht op acceptatie";
