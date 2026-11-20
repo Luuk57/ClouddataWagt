@@ -9,7 +9,7 @@
   <style>
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
     body { margin: 0; background: #0f172a; color: #f8fafc; min-height: 100vh; }
-    .container { max-width: 780px; margin: 0 auto; padding: 24px 16px 48px; }
+    .container { max-width: 820px; margin: 0 auto; padding: 24px 16px 56px; }
     .card {
       background: #1e293b; border: 1px solid #334155; border-radius: 12px;
       padding: 20px; margin-bottom: 16px;
@@ -27,8 +27,10 @@
     button:hover { background: #1d4ed8; }
     button.secondary { background: #334155; }
     button.secondary:hover { background: #475569; }
-    .row { display: flex; gap: 10px; align-items: center; }
-    .row > * { flex: 1; }
+    button.danger { background: #991b1b; padding: 6px 10px; font-size: 0.85rem; width: auto; }
+    button.danger:hover { background: #b91c1c; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 160px; }
     .hidden { display: none; }
     .badge {
       display: inline-block; padding: 4px 10px; border-radius: 999px;
@@ -38,9 +40,26 @@
     .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
     .checkbox-row input { width: auto; margin: 0; }
     .checkbox-row label { margin: 0; }
-    .user-item {
+    .user-item, .log-item {
       border-top: 1px solid #334155; padding-top: 12px; margin-top: 12px;
     }
+    .log-item {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .progress-box { margin-bottom: 16px; }
+    .progress-header {
+      display: flex; justify-content: space-between; font-size: 0.95rem;
+      margin-bottom: 6px; font-weight: 600;
+    }
+    .progress-track {
+      width: 100%; height: 22px; background: #0f172a; border: 1px solid #475569;
+      border-radius: 999px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; width: 0%; background: #22c55e;
+      transition: width 0.25s ease, background-color 0.25s ease;
+    }
+    .muted { color: #94a3b8; font-size: 0.88rem; }
   </style>
 </head>
 <body>
@@ -79,12 +98,55 @@
         </div>
       </div>
 
-      <!-- Modules op basis van rechten -->
-      <div class="card">
-        <h3>Beschikbare schermen</h3>
-        <div id="moduleData" class="hidden">
-          <p><strong>Data &amp; invoer:</strong> Je hebt recht om gegevens te bekijken en op te slaan.</p>
+      <!-- Vocht Intake Module (24u en 48u progress bars) -->
+      <div id="moduleFluid" class="card hidden">
+        <h2>Vocht Intake</h2>
+        <p class="muted">Overzicht over de afgelopen 24 uur en afgelopen 48 uur (tussen 2 dialyses).</p>
+
+        <!-- Progress bar 24 uur -->
+        <div class="progress-box">
+          <div class="progress-header">
+            <span>Laatste 24 uur</span>
+            <span id="label24h">0 / 1000 ml (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div id="bar24h" class="progress-fill"></div>
+          </div>
         </div>
+
+        <!-- Progress bar 48 uur / tussen 2 dialyses -->
+        <div class="progress-box">
+          <div class="progress-header">
+            <span>Laatste 48 uur (tussen 2 dialyses)</span>
+            <span id="label48h">0 / 2000 ml (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div id="bar48h" class="progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Snelle vochtinvoer -->
+        <form id="fluidForm">
+          <div class="row">
+            <div>
+              <label for="fluidMlInput">Hoeveelheid (ml)</label>
+              <input id="fluidMlInput" type="number" min="1" max="5000" step="10" required placeholder="bijv. 200" />
+            </div>
+            <div>
+              <label for="fluidNoteInput">Omschrijving (optioneel)</label>
+              <input id="fluidNoteInput" type="text" placeholder="bijv. water, koffie, soep" />
+            </div>
+          </div>
+          <button type="submit">Vocht toevoegen</button>
+        </form>
+
+        <h3 style="margin-top: 20px;">Recente invoer (laatste 48 uur)</h3>
+        <div id="fluidHistoryList">Geen invoer in de afgelopen 48 uur.</div>
+      </div>
+
+      <!-- Overige modules op basis van rechten -->
+      <div class="card">
+        <h3>Overige schermen</h3>
         <div id="moduleReports" class="hidden">
           <p><strong>Overzichten:</strong> Je hebt recht om rapportages en overzichten te bekijken.</p>
         </div>
@@ -97,10 +159,21 @@
       <div id="adminSection" class="card hidden">
         <h2>Beheer (Admin)</h2>
 
-        <h3>Systeeminstellingen (<code>settings/app</code>)</h3>
+        <h3>Systeem- &amp; vochtdoelen (<code>settings/app</code>)</h3>
         <form id="settingsForm">
           <label for="systemTitleInput">Titel in de schil</label>
           <input id="systemTitleInput" type="text" required />
+
+          <div class="row">
+            <div>
+              <label for="goal24hInput">Doel 24 uur (ml)</label>
+              <input id="goal24hInput" type="number" min="100" max="10000" step="50" required />
+            </div>
+            <div>
+              <label for="goal48hInput">Doel 48 uur / tussen 2 dialyses (ml)</label>
+              <input id="goal48hInput" type="number" min="100" max="15000" step="50" required />
+            </div>
+          </div>
 
           <div class="checkbox-row">
             <input id="maintenanceInput" type="checkbox" />
