@@ -183,7 +183,7 @@
     .task-item svg { width: 14px; height: 14px; stroke: #bae6fd; fill: none; stroke-width: 2; flex-shrink: 0; }
     .task-item:hover { background: rgba(255, 255, 255, 0.15); }
     .task-item.active { background: rgba(255, 255, 255, 0.22); border-bottom: 3px solid #38bdf8; color: #fff; font-weight: 600; }
-    .taskbar-tray { display: flex; align-items: center; gap: 12px; font-size: 0.78rem; color: #cbd5e1; flex-shrink: 0; }
+    .taskbar-tray { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: #cbd5e1; flex-shrink: 0; }
 
     #startMenu {
       position: fixed; bottom: 54px; left: 10px; width: 364px; max-width: calc(100vw - 20px);
@@ -193,7 +193,7 @@
       box-shadow: 0 18px 42px rgba(0, 0, 0, 0.65); display: none;
     }
     .start-brand-header {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.14); padding-bottom: 10px;
     }
     .start-section-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin: 12px 0 6px 0; letter-spacing: 0.06em; }
@@ -339,7 +339,10 @@
         <div style="font-size:0.92rem; font-weight:700; color:#fff;">Cloudbeheer</div>
         <div style="font-size:0.74rem; color:#94a3b8;" id="startUserLabel">Gebruiker</div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="logout()">Afmelden</button>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="toggleFullscreen()" id="startFsBtn">Volledig beeld</button>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Afmelden</button>
+      </div>
     </div>
     <div class="start-section-title">Losse Stamgegevens-Apps</div>
     <div class="start-grid" id="startMicroApps"></div>
@@ -354,6 +357,7 @@
       <div id="taskbarWindows" style="display:flex; gap:6px; align-items:center;"></div>
     </div>
     <div class="taskbar-tray">
+      <button class="btn btn-secondary btn-sm" onclick="toggleFullscreen()" id="trayFsBtn" title="Volledig beeld in/uit">&#9974; Volledig beeld</button>
       <button class="btn btn-secondary btn-sm" onclick="minimizeAllWindows()" title="Alle vensters minimaliseren">Bureaublad</button>
       <span id="trayClock">12:00</span>
     </div>
@@ -385,6 +389,42 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
+
+  // VOLLEDIG BEELD (FULLSCREEN)
+  function isFullscreenActive() {
+    return Boolean(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.msFullscreenElement
+    );
+  }
+
+  function toggleFullscreen() {
+    if (!isFullscreenActive()) {
+      const root = document.documentElement;
+      const req = root.requestFullscreen || root.webkitRequestFullscreen || root.msRequestFullscreen;
+      if (req) {
+        req.call(root).catch(() => {});
+      }
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (exit) {
+        exit.call(document).catch(() => {});
+      }
+    }
+  }
+
+  function syncFullscreenLabels() {
+    const active = isFullscreenActive();
+    const trayBtn = document.getElementById('trayFsBtn');
+    const startBtn = document.getElementById('startFsBtn');
+    if (trayBtn) trayBtn.innerHTML = active ? '&#10005; Sluit volledig beeld' : '&#9974; Volledig beeld';
+    if (startBtn) startBtn.innerText = active ? 'Sluit volledig beeld' : 'Volledig beeld';
+  }
+
+  document.addEventListener('fullscreenchange', syncFullscreenLabels);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenLabels);
+  document.addEventListener('msfullscreenchange', syncFullscreenLabels);
 
   // STANDALONE VECTOR-SVG ICONEN PER PROGRAMMA
   const SVG_ICONS = {
@@ -559,6 +599,7 @@
     document.getElementById('desktop').style.display = 'block';
     document.getElementById('taskbar').style.display = 'flex';
     document.getElementById('startUserLabel').innerText = state.user.email;
+    syncFullscreenLabels();
 
     const deskIcons = document.getElementById('desktopIconsContainer');
     const startMicro = document.getElementById('startMicroApps');
