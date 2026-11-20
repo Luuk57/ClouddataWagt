@@ -1,0 +1,9 @@
+{
+  "name": "Cloudsysteem Wagt 2026",
+  "short_name": "Wagt 2026",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": []
+}
