@@ -1,4 +1,4 @@
-const CACHE_NAME = "wagt-2026-v8";
+const CACHE_NAME = "wagt-2026-v11";
 const ASSETS = ["./", "./index.html", "./app.js", "./manifest.json"];
 
 self.addEventListener("install", (event) => {
