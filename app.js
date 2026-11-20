@@ -15,14 +15,14 @@ import {
   getDocs
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-// Vervang dit blok door de configuratie van jouw eigen Firebase-project
+// Configuratie voor Cloudsysteem Wagt 2026
 const firebaseConfig = {
-  apiKey: "JOUW_API_KEY",
-  authDomain: "JOUW_PROJECT.firebaseapp.com",
-  projectId: "JOUW_PROJECT_ID",
-  storageBucket: "JOUW_PROJECT.firebasestorage.app",
-  messagingSenderId: "JOUW_SENDER_ID",
-  appId: "JOUW_APP_ID"
+  apiKey: "AIzaSyAO-0eNDaOxWhW9WfaZ2kaDyFyFQQdeRYo",
+  authDomain: "cloudsysteem-wagt-2026.firebaseapp.com",
+  projectId: "cloudsysteem-wagt-2026",
+  storageBucket: "cloudsysteem-wagt-2026.firebasestorage.app",
+  messagingSenderId: "454261505433",
+  appId: "1:454261505433:web:931038fadf03daee236708"
 };
 
 const app = initializeApp(firebaseConfig);
