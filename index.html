@@ -2,270 +2,677 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0b192c" />
-  <title>Cloudsysteem Wagt 2026 — Online Database Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0b1120" />
+  <title>Cloudsysteem Wagt 2026 — Android Shell</title>
   <link rel="manifest" href="manifest.json" />
   <style>
-    * { box-sizing: border-box; font-family: "Segoe UI", system-ui, -apple-system, sans-serif; }
+    :root {
+      --bg-canvas: #090e1a;
+      --bg-surface: #111827;
+      --bg-surface-2: #182234;
+      --bg-surface-3: #1f2b42;
+      --border-subtle: rgba(148, 163, 184, 0.14);
+      --border-strong: rgba(148, 163, 184, 0.25);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-strong: #0284c7;
+      --accent-soft: rgba(56, 189, 248, 0.14);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: "Inter", "Roboto", system-ui, -apple-system, sans-serif;
+    }
+
     body {
       margin: 0;
       min-height: 100vh;
-      background: radial-gradient(circle at top left, #17365d 0%, #0b192c 55%, #07101d 100%);
-      color: #f1f5f9;
-      padding-bottom: 64px;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.12), transparent 36%),
+        radial-gradient(circle at 88% 15%, rgba(14, 165, 233, 0.08), transparent 40%),
+        var(--bg-canvas);
+      color: var(--text-primary);
     }
 
-    .server-topbar {
-      background: #081220;
-      border-bottom: 1px solid #233b5c;
+    .hidden { display: none !important; }
+
+    /* Login Layout */
+    .auth-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(17, 24, 39, 0.92);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      padding: 28px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .auth-card h1 {
+      margin: 0 0 6px;
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .auth-subtitle {
+      margin: 0 0 22px;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    /* Android Tablet Shell Layout */
+    .android-shell {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      min-height: 100vh;
+    }
+
+    /* Navigation Rail */
+    .nav-rail {
+      background: rgba(13, 19, 33, 0.95);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 18px 8px;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .rail-logo {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: #fff;
+      margin-bottom: 10px;
+      box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+    }
+    .rail-btn {
+      width: 72px;
+      padding: 10px 6px;
+      border-radius: 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .rail-btn:hover {
+      background: var(--bg-surface-2);
+      color: var(--text-primary);
+    }
+    .rail-btn.active {
+      background: var(--accent-soft);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: var(--accent);
+    }
+    .rail-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.85;
+    }
+    .rail-spacer { flex: 1; }
+
+    /* Main Workspace */
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* Top App Bar */
+    .top-app-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(9, 14, 26, 0.84);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .top-title-group h2 {
+      margin: 0;
+      font-size: 1.18rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .top-sub {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .live-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #86efac;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .live-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    .role-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-strong);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    /* Content Container */
+    .content-area {
+      padding: 22px 24px 44px;
+      max-width: 1240px;
+      width: 100%;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 18px;
+    }
+
+    /* Surface Cards */
+    .surface-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+      margin-bottom: 18px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .card-header h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .card-desc {
+      margin: 4px 0 0;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    /* Form Controls (Touch-friendly) */
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+    input, select {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface-2);
+      color: var(--text-primary);
+      font-size: 0.96rem;
+      margin-bottom: 14px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    }
+
+    button {
+      min-height: 46px;
       padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #fff;
+      font-size: 0.94rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.08s ease, filter 0.15s ease;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:active { transform: scale(0.99); }
+
+    button.btn-ghost {
+      background: var(--bg-surface-2);
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+    button.btn-ghost:hover { background: var(--bg-surface-3); }
+
+    button.btn-danger {
+      min-height: 36px;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      background: rgba(239, 68, 68, 0.14);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
+    button.btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .row > * {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      min-height: 20px;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+    .checkbox-row label {
+      margin: 0;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    /* KPI & Progress Bars */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .kpi-box {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .kpi-label {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+    .kpi-value {
+      font-size: 1.35rem;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .meter-block { margin-bottom: 16px; }
+    .meter-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .meter-track {
+      width: 100%;
+      height: 14px;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: var(--success);
+      transition: width 0.28s ease, background-color 0.28s ease;
+    }
+
+    /* Lists & Records */
+    .list-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      flex-wrap: wrap;
+      padding: 12px 0;
+      border-top: 1px solid var(--border-subtle);
     }
-    .server-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
-    .server-tag {
-      background: #1d4ed8; color: #fff; font-size: 0.75rem;
-      padding: 2px 8px; border-radius: 4px; letter-spacing: 0.04em;
-    }
-    .live-pill {
-      display: inline-flex; align-items: center; gap: 6px;
-      background: #064e3b; color: #6ee7b7; border: 1px solid #10b981;
-      padding: 2px 8px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
-    }
-    .server-meta { font-size: 0.85rem; color: #94a3b8; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .list-item:first-child { border-top: none; padding-top: 0; }
+    .item-sub { color: var(--text-secondary); font-size: 0.82rem; margin-top: 2px; }
 
-    .desktop-wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px; }
-
-    .window {
-      background: #102036;
-      border: 1px solid #2b4c7e;
-      border-radius: 6px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-      margin-bottom: 18px;
-      overflow: hidden;
+    .user-card {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 12px;
     }
-    .window-titlebar {
-      background: linear-gradient(90deg, #163256 0%, #1e4270 100%);
-      padding: 10px 14px;
-      border-bottom: 1px solid #2b4c7e;
+    .user-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-weight: 600;
-      font-size: 0.98rem;
-    }
-    .window-body { padding: 18px; }
-
-    label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: #cbd5e1; }
-    input, select, button {
-      width: 100%; padding: 10px 12px; border-radius: 4px;
-      border: 1px solid #3b6094; font-size: 0.98rem;
-    }
-    input, select { background: #091322; color: #f8fafc; margin-bottom: 12px; }
-    button {
-      background: #2563eb; color: #fff; border: 1px solid #3b82f6;
-      font-weight: 600; cursor: pointer;
-    }
-    button:hover { background: #1d4ed8; }
-    button.secondary { background: #1e3352; border-color: #3b6094; }
-    button.secondary:hover { background: #294670; }
-    button.small-btn { padding: 6px 10px; font-size: 0.84rem; width: auto; }
-    button.danger { background: #991b1b; border-color: #dc2626; padding: 6px 10px; font-size: 0.84rem; width: auto; }
-    button.danger:hover { background: #b91c1c; }
-
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .row > * { flex: 1; min-width: 150px; }
-    .hidden { display: none; }
-    .badge {
-      display: inline-block; padding: 3px 9px; border-radius: 4px;
-      font-size: 0.78rem; font-weight: 700; background: #1e3a8a; color: #bfdbfe;
-    }
-    .status { min-height: 20px; font-size: 0.9rem; color: #7dd3fc; margin-top: 8px; }
-    .muted { color: #94a3b8; font-size: 0.88rem; }
-    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .checkbox-row input { width: auto; margin: 0; }
-    .checkbox-row label { margin: 0; }
-
-    .user-item, .log-item, .db-record {
-      border-top: 1px solid #233b5c; padding-top: 10px; margin-top: 10px;
-    }
-    .log-item, .db-record {
-      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
-    }
-    .btn-group { display: flex; gap: 6px; align-items: center; }
-
-    .progress-box { margin-bottom: 14px; }
-    .progress-header {
-      display: flex; justify-content: space-between; font-size: 0.92rem;
-      margin-bottom: 6px; font-weight: 600;
-    }
-    .progress-track {
-      width: 100%; height: 22px; background: #091322; border: 1px solid #3b6094;
-      border-radius: 4px; overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%; width: 0%; background: #22c55e;
-      transition: width 0.25s ease, background-color 0.25s ease;
+      gap: 8px;
+      margin-bottom: 10px;
     }
 
-    pre.json-box {
-      background: #07101d; border: 1px solid #233b5c; border-radius: 4px;
-      padding: 10px; margin: 6px 0 0; font-size: 0.8rem; color: #bae6fd;
-      overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    pre.db-json {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: #070b14;
+      border: 1px solid var(--border-subtle);
+      color: #bae6fd;
+      font-size: 0.78rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
     }
 
-    .taskbar {
-      position: fixed; bottom: 0; left: 0; right: 0; height: 48px;
-      background: #081220; border-top: 1px solid #2b4c7e;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0 10px; gap: 8px; z-index: 50;
+    .toast-bar {
+      font-size: 0.86rem;
+      color: var(--accent);
+      min-height: 20px;
+      margin-top: 8px;
     }
-    .taskbar-left { display: flex; align-items: center; gap: 8px; overflow-x: auto; }
-    .start-btn {
-      background: #1d4ed8; color: #fff; border: 1px solid #60a5fa;
-      padding: 6px 12px; border-radius: 4px; font-weight: 700; width: auto; font-size: 0.88rem;
+
+    @media (max-width: 720px) {
+      .android-shell {
+        grid-template-columns: 1fr;
+        padding-bottom: 72px;
+      }
+      .nav-rail {
+        position: fixed;
+        bottom: 0;
+        top: auto;
+        left: 0;
+        right: 0;
+        height: 66px;
+        width: 100%;
+        flex-direction: row;
+        justify-content: space-around;
+        border-right: none;
+        border-top: 1px solid var(--border-subtle);
+        padding: 6px;
+        z-index: 40;
+      }
+      .rail-logo, .rail-spacer { display: none; }
+      .rail-btn {
+        width: auto;
+        flex: 1;
+        padding: 6px 4px;
+        font-size: 0.68rem;
+      }
+      .content-area, .top-app-bar { padding-left: 16px; padding-right: 16px; }
     }
-    .task-pill {
-      background: #162b49; color: #e2e8f0; border: 1px solid #2b4c7e;
-      padding: 6px 10px; border-radius: 4px; font-size: 0.82rem; width: auto; white-space: nowrap;
-    }
-    .task-clock { font-size: 0.82rem; color: #cbd5e1; white-space: nowrap; }
   </style>
 </head>
 <body>
-  <header class="server-topbar">
-    <div class="server-brand">
-      <span class="server-tag">WIN-SRV-2026</span>
-      <span id="serverTitleText">Cloudsysteem Wagt 2026</span>
-      <span id="liveDbBadge" class="live-pill hidden">LIVE DB</span>
+  <!-- Login Scherm -->
+  <div id="loginView" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="brand-mark">Android Tablet Shell • 2026</div>
+      <h1 id="loginBrandTitle">Cloudsysteem Wagt 2026</h1>
+      <p class="auth-subtitle">Meld je aan met jouw account om de live database-omgeving en vochtmonitoring te openen.</p>
+
+      <form id="loginForm">
+        <label for="emailInput">E-mailadres</label>
+        <input id="emailInput" type="email" autocomplete="email" required placeholder="naam@voorbeeld.nl" />
+
+        <label for="passwordInput">Wachtwoord</label>
+        <input id="passwordInput" type="password" autocomplete="current-password" required placeholder="••••••••" />
+
+        <button type="submit" style="width: 100%;">Open Android Shell</button>
+      </form>
+      <div id="loginStatus" class="toast-bar"></div>
     </div>
-    <div class="server-meta">
-      <span id="dbStatsText">Firestore: cloudsysteem-wagt-2026</span>
-      <span id="serverConnStatus">GitHub &amp; Firestore</span>
-    </div>
-  </header>
+  </div>
 
-  <main class="desktop-wrap">
-    <section id="loginSection" class="window" style="max-width: 520px; margin: 24px auto;">
-      <div class="window-titlebar">
-        <span>Windows Server Aanmelding — Online Database</span>
-        <span class="badge">AUTH</span>
-      </div>
-      <div class="window-body">
-        <p class="muted">Log in om live verbinding te maken met de Cloud Firestore-database.</p>
-        <form id="loginForm">
-          <label for="emailInput">E-mailadres</label>
-          <input id="emailInput" type="email" required placeholder="naam@voorbeeld.nl" />
+  <!-- Professionele Android Tablet Schil -->
+  <div id="shellView" class="android-shell hidden">
+    <aside class="nav-rail" aria-label="Hoofdnavigatie">
+      <div class="rail-logo">W26</div>
 
-          <label for="passwordInput">Wachtwoord</label>
-          <input id="passwordInput" type="password" required placeholder="••••••••" />
+      <button type="button" class="rail-btn active" data-tab="dashboard" id="navDashboardBtn">
+        <span class="rail-dot"></span>
+        <span>Overzicht</span>
+      </button>
 
-          <button type="submit">Aanmelden op database-server</button>
-        </form>
-        <div id="loginStatusMsg" class="status"></div>
-      </div>
-    </section>
+      <button type="button" class="rail-btn" data-tab="fluid" id="navFluidBtn">
+        <span class="rail-dot"></span>
+        <span>Vocht</span>
+      </button>
 
-    <section id="shellSection" class="hidden">
-      <div class="window">
-        <div class="window-titlebar">
-          <span id="welcomeTitle">Sessie</span>
-          <span id="roleBadge" class="badge">GEBRUIKER</span>
+      <button type="button" class="rail-btn hidden" data-tab="admin" id="navAdminBtn">
+        <span class="rail-dot"></span>
+        <span>Beheer</span>
+      </button>
+
+      <div class="rail-spacer"></div>
+
+      <button type="button" class="rail-btn" id="railLogoutBtn">
+        <span class="rail-dot"></span>
+        <span>Uitloggen</span>
+      </button>
+    </aside>
+
+    <div class="workspace">
+      <header class="top-app-bar">
+        <div class="top-title-group">
+          <h2 id="headerTitle">Cloudsysteem Wagt 2026</h2>
+          <div class="top-sub" id="headerSub">Verbonden met Cloud Firestore</div>
         </div>
-        <div class="window-body">
-          <div class="row">
-            <div>
-              <div id="appBanner">Live verbonden met Cloud Firestore.</div>
-              <div id="statusMsg" class="status"></div>
-            </div>
-            <div style="max-width: 170px;">
-              <button id="logoutBtn" type="button" class="secondary">Afmelden</button>
-            </div>
-          </div>
+        <div class="top-actions">
+          <span class="live-chip"><span class="live-pulse"></span>LIVE DB</span>
+          <span class="role-pill" id="headerRoleBadge">GEBRUIKER</span>
+          <span class="role-pill" id="clockBadge">--:--</span>
         </div>
-      </div>
+      </header>
 
-      <div class="grid-2">
-        <!-- Venster: Vocht Intake (24u & 48u live via Firestore) -->
-        <div id="moduleFluid" class="window hidden">
-          <div class="window-titlebar">
-            <span>Vocht Intake — 24u / 48u (tussen 2 dialyses)</span>
-            <span class="badge">LIVE DB</span>
-          </div>
-          <div class="window-body">
-            <div class="progress-box">
-              <div class="progress-header">
-                <span>Laatste 24 uur</span>
-                <span id="label24h">0 / 1000 ml (0%)</span>
-              </div>
-              <div class="progress-track">
-                <div id="bar24h" class="progress-fill"></div>
-              </div>
-            </div>
+      <main class="content-area">
+        <div id="globalToast" class="toast-bar" style="margin-top: 0; margin-bottom: 14px;"></div>
 
-            <div class="progress-box">
-              <div class="progress-header">
-                <span>Laatste 48 uur (tussen 2 dialyses)</span>
-                <span id="label48h">0 / 2000 ml (0%)</span>
-              </div>
-              <div class="progress-track">
-                <div id="bar48h" class="progress-fill"></div>
-              </div>
-            </div>
-
-            <form id="fluidForm">
-              <div class="row">
-                <div>
-                  <label for="fluidMlInput">Hoeveelheid (ml)</label>
-                  <input id="fluidMlInput" type="number" min="1" max="5000" step="10" required placeholder="bijv. 200" />
-                </div>
-                <div>
-                  <label for="fluidNoteInput">Notitie (optioneel)</label>
-                  <input id="fluidNoteInput" type="text" placeholder="bijv. water, koffie" />
-                </div>
-              </div>
-              <button type="submit">Record wegschrijven naar database</button>
-            </form>
-
-            <h3 style="margin-top: 18px; margin-bottom: 6px;">Database-records (laatste 48 uur)</h3>
-            <div id="fluidHistoryList">Laden...</div>
-          </div>
-        </div>
-
-        <!-- Venster: Overzichten & Modules -->
-        <div class="window">
-          <div class="window-titlebar">
-            <span>Servermodules &amp; Rechten</span>
-            <span class="badge">MODULES</span>
-          </div>
-          <div class="window-body">
-            <div id="moduleReports" class="hidden">
-              <p><strong>Overzichten:</strong> Recht actief om overzichten en rapportages te raadplegen.</p>
-            </div>
-            <div id="noModulesMsg">
-              <p class="muted">Geen extra modules toegewezen aan dit account.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Venster: Serverbeheer, Rechten & Live Database Explorer -->
-      <div id="adminSection" class="window hidden">
-        <div class="window-titlebar">
-          <span>Serverbeheer, Rechten &amp; Online Database Explorer (Admin)</span>
-          <span class="badge">ADMIN DB</span>
-        </div>
-        <div class="window-body">
+        <!-- Tab 1: Overzicht -->
+        <section id="tabDashboard" class="tab-panel">
           <div class="grid-2">
-            <div>
-              <h3>Systeem- &amp; vochtdoelen (<code>settings/app</code>)</h3>
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3 id="welcomeHeading">Welkom</h3>
+                  <p class="card-desc" id="systemBannerText">Live status van jouw sessie en database.</p>
+                </div>
+              </div>
+              <div class="kpi-grid">
+                <div class="kpi-box">
+                  <div class="kpi-label">Inname 24 uur</div>
+                  <div class="kpi-value" id="kpi24h">0 ml</div>
+                </div>
+                <div class="kpi-box">
+                  <div class="kpi-label">Inname 48 uur</div>
+                  <div class="kpi-value" id="kpi48h">0 ml</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3>Toegewezen Modules</h3>
+                  <p class="card-desc">Actieve functies op basis van jouw rechtenprofiel.</p>
+                </div>
+              </div>
+              <div id="moduleSummaryList">
+                <div class="list-item">
+                  <div>
+                    <strong>Vocht Intake (24u / 48u)</strong>
+                    <div class="item-sub">Monitoring tussen 2 dialyses</div>
+                  </div>
+                  <span class="role-pill" id="permFluidStatus">Actief</span>
+                </div>
+                <div class="list-item hidden" id="permReportsRow">
+                  <div>
+                    <strong>Overzichten &amp; Rapportages</strong>
+                    <div class="item-sub">Recht voor aanvullende inzichten</div>
+                  </div>
+                  <span class="role-pill">Actief</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 2: Vocht Intake (24u & 48u Progress Bars) -->
+        <section id="tabFluid" class="tab-panel hidden">
+          <div class="grid-2">
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3>Vocht Intake Monitoring</h3>
+                  <p class="card-desc">Voortgang over 24 uur en 48 uur (tussen 2 dialyses).</p>
+                </div>
+              </div>
+
+              <div class="meter-block">
+                <div class="meter-top">
+                  <span>Laatste 24 uur</span>
+                  <span id="label24h">0 / 1000 ml (0%)</span>
+                </div>
+                <div class="meter-track">
+                  <div id="bar24h" class="meter-fill"></div>
+                </div>
+              </div>
+
+              <div class="meter-block">
+                <div class="meter-top">
+                  <span>Laatste 48 uur (tussen 2 dialyses)</span>
+                  <span id="label48h">0 / 2000 ml (0%)</span>
+                </div>
+                <div class="meter-track">
+                  <div id="bar48h" class="meter-fill"></div>
+                </div>
+              </div>
+
+              <form id="fluidForm" style="margin-top: 18px;">
+                <div class="row">
+                  <div>
+                    <label for="fluidMlInput">Hoeveelheid (ml)</label>
+                    <input id="fluidMlInput" type="number" min="1" max="5000" step="10" required placeholder="bijv. 200" />
+                  </div>
+                  <div>
+                    <label for="fluidNoteInput">Notitie (optioneel)</label>
+                    <input id="fluidNoteInput" type="text" placeholder="bijv. water, koffie, soep" />
+                  </div>
+                </div>
+                <button type="submit" style="width: 100%;">Vochtinname opslaan</button>
+              </form>
+            </div>
+
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3>Recente Invoer (48 uur)</h3>
+                  <p class="card-desc">Live gesynchroniseerd met Cloud Firestore.</p>
+                </div>
+              </div>
+              <div id="fluidHistoryList">Geen invoer in de afgelopen 48 uur.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tab 3: Admin Beheer, Rechten & Live Database -->
+        <section id="tabAdmin" class="tab-panel hidden">
+          <div class="grid-2">
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3>Systeem- &amp; Vochtdoelen</h3>
+                  <p class="card-desc">Document <code>settings/app</code> in Firestore.</p>
+                </div>
+              </div>
+
               <form id="settingsForm">
-                <label for="systemTitleInput">Server- / schiltitel</label>
+                <label for="systemTitleInput">Naam in de schil</label>
                 <input id="systemTitleInput" type="text" required />
 
                 <div class="row">
@@ -281,40 +688,43 @@
 
                 <div class="checkbox-row">
                   <input id="maintenanceInput" type="checkbox" />
-                  <label for="maintenanceInput">Onderhoudsmodus actief</label>
+                  <label for="maintenanceInput">Onderhoudsmodus inschakelen</label>
                 </div>
 
-                <button type="submit">Serverinstellingen opslaan</button>
+                <button type="submit" style="width: 100%;">Instellingen opslaan</button>
               </form>
+            </div>
 
-              <h3 style="margin-top: 22px;">Gebruikers &amp; rechten (<code>users</code>)</h3>
+            <div class="surface-card">
+              <div class="card-header">
+                <div>
+                  <h3>Gebruikers &amp; Rechten</h3>
+                  <p class="card-desc">Rollen en module-rechten direct uitdelen.</p>
+                </div>
+              </div>
               <div id="usersList">Gebruikers laden...</div>
             </div>
-
-            <div>
-              <h3>Live Database Explorer</h3>
-              <label for="dbCollectionSelect">Collectie bekijken</label>
-              <select id="dbCollectionSelect">
-                <option value="fluidIntake">fluidIntake (vochtrecords)</option>
-                <option value="users">users (gebruikers &amp; rechten)</option>
-                <option value="settings">settings (systeeminstellingen)</option>
-              </select>
-              <div id="dbExplorerList">Database-records laden...</div>
-            </div>
           </div>
-        </div>
-      </div>
-    </section>
-  </main>
 
-  <footer class="taskbar">
-    <div class="taskbar-left">
-      <button type="button" id="focusTopBtn" class="start-btn">Server</button>
-      <button type="button" id="focusFluidBtn" class="task-pill">Vocht 24u/48u</button>
-      <button type="button" id="focusAdminBtn" class="task-pill hidden">Admin DB</button>
+          <div class="surface-card">
+            <div class="card-header">
+              <div>
+                <h3>Live Database Records</h3>
+                <p class="card-desc">Inspecteer en beheer documenten in Cloud Firestore.</p>
+              </div>
+            </div>
+            <label for="dbCollectionSelect">Collectie</label>
+            <select id="dbCollectionSelect" style="max-width: 340px;">
+              <option value="fluidIntake">fluidIntake (vochtinname)</option>
+              <option value="users">users (gebruikers &amp; rechten)</option>
+              <option value="settings">settings (instellingen)</option>
+            </select>
+            <div id="dbExplorerList">Laden...</div>
+          </div>
+        </section>
+      </main>
     </div>
-    <div class="task-clock" id="taskbarClock">--:--</div>
-  </footer>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>
